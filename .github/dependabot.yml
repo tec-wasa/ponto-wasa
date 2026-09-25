@@ -1,24 +1,49 @@
+# Atualizações automáticas de dependências, em ritmo baixo: um pull request por ecossistema por semana,
+# atualizações menores agrupadas e saltos de versão MAIOR ignorados (decisão manual, depois de testar).
+# Para liberar um salto maior, remova a regra "ignore" do ecossistema correspondente (ou abra o pull request à mão).
 version: 2
 updates:
   - package-ecosystem: pip
     directory: /backend
     schedule:
       interval: weekly
+      day: monday
+    open-pull-requests-limit: 2
     groups:
       python-minor-patch:
         update-types: [minor, patch]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
   - package-ecosystem: npm
     directory: /frontend
     schedule:
       interval: weekly
+      day: monday
+    open-pull-requests-limit: 2
     groups:
       npm-minor-patch:
         update-types: [minor, patch]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
   - package-ecosystem: docker
     directory: /
     schedule:
-      interval: weekly
+      interval: monthly
+    open-pull-requests-limit: 1
+    ignore:
+      # a imagem base acompanha as versões do Node e do Python usadas nos testes (CI): trocar de versão maior é decisão manual
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
+      interval: monthly
+    open-pull-requests-limit: 1
+    groups:
+      actions:
+        patterns: ["*"]
