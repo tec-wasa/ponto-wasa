@@ -34,6 +34,8 @@ Siga `deploy/README.md`. Lista de conferência:
 
 ## 3. Fase B: ensaio interno (uma semana)
 
+Passo a passo detalhado, com tabela de testes numerada e como registrar o resultado: [ensaio-fase-b.md](ensaio-fase-b.md).
+
 Roteiro de testes práticos (marcar cada item; anotar o que falhar com aparelho, navegador e horário):
 
 **Aplicativo do colaborador**

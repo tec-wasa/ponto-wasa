@@ -25,3 +25,4 @@ Thumbs.db
 *.pfx
 *.pem
 !deploy/.env.example
+ensaio/
