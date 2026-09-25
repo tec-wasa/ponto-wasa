@@ -98,8 +98,10 @@ jobs:
           cache-to: type=gha,mode=max
       - name: Imagem roda sem privilégios e responde
         run: |
-          docker run -d --name ponto-smoke -p 8000:8000 -e PONTO_SECRET_KEY=ci-secret-ci-secret-ci-secret-ci-secret ponto:ci
+          # sem PostgreSQL neste passo: SQLite em /tmp (o diretório da aplicação não é gravável pelo usuário sem privilégios)
+          docker run -d --name ponto-smoke -p 8000:8000 -e PONTO_SECRET_KEY=ci-secret-ci-secret-ci-secret-ci-secret \n            -e PONTO_DATABASE_URL=sqlite:////tmp/ponto-ci.db ponto:ci
           for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8000/api/ready && break; sleep 1; done
+          curl -fsS http://127.0.0.1:8000/api/ready || { docker logs ponto-smoke 2>&1 | tail -30; exit 1; }
           curl -fsS http://127.0.0.1:8000/api/health
           curl -fsS http://127.0.0.1:8000/ | grep -q '<div id="root">'          # o front-end compilado é servido
           curl -fsSI http://127.0.0.1:8000/api/health | grep -i "content-security-policy"
