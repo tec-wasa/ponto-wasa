@@ -1,0 +1,126 @@
+# Implantação em uma VM (qualquer nuvem ou servidor próprio): PostgreSQL + aplicação + HTTPS + backups.
+#
+#   cp .env.example .env   # preencher TODOS os valores
+#   docker compose up -d
+#
+# Fluxo de subida: db saudável -> migrate (migra como dono e cria o papel restrito) -> app -> caddy (HTTPS).
+
+name: ponto
+
+services:
+  db:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ponto_owner
+      POSTGRES_PASSWORD: "${OWNER_DB_PASSWORD:?defina OWNER_DB_PASSWORD}"
+      POSTGRES_DB: ponto
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ponto_owner -d ponto"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [internal]  # sem portas publicadas: só a aplicação e o backup falam com o banco
+
+  migrate:
+    image: "${PONTO_IMAGE:?defina PONTO_IMAGE}"
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PONTO_OWNER_DATABASE_URL: postgresql+psycopg://ponto_owner:${OWNER_DB_PASSWORD}@db:5432/ponto
+      PONTO_APP_DB_PASSWORD: "${APP_DB_PASSWORD:?defina APP_DB_PASSWORD}"
+    command: ["python", "-m", "app.dbinit"]
+    networks: [internal]
+
+  app:
+    image: ${PONTO_IMAGE}
+    restart: unless-stopped
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      # A aplicação usa o papel restrito (sem UPDATE/DELETE/TRUNCATE em marcações e auditoria).
+      PONTO_DATABASE_URL: postgresql+psycopg://ponto_app:${APP_DB_PASSWORD}@db:5432/ponto
+      PONTO_SECRET_KEY: "${SECRET_KEY:?defina SECRET_KEY (>= 32 caracteres)}"
+      PONTO_INPI_NUMBER: ${INPI_NUMBER:-}
+      PONTO_DEV_ID: ${DEV_ID:-}
+      PONTO_DEV_NAME: ${DEV_NAME:-}
+      PONTO_DEV_EMAIL: ${DEV_EMAIL:-}
+      PONTO_CLOCK_CHECK_ENABLED: ${CLOCK_CHECK_ENABLED:-true}
+      PONTO_OFFLINE_PUNCH_ENABLED: ${OFFLINE_PUNCH_ENABLED:-true}
+      PONTO_OFFLINE_MAX_HOURS: ${OFFLINE_MAX_HOURS:-72}
+      # fotos opcionais das batidas (criptografadas; apagadas no fechamento do mês). Na nuvem, troque por bucket (ver README)
+      PONTO_PHOTO_DIR: /data/photos
+      # fotos em bucket S3-compatível (privado): PHOTO_STORE=s3 e as variáveis S3_* do .env (ver README > Fotos)
+      PONTO_PHOTO_STORE: ${PHOTO_STORE:-local}
+      PONTO_S3_BUCKET: ${S3_BUCKET:-}
+      PONTO_S3_ENDPOINT_URL: ${S3_ENDPOINT_URL:-}
+      PONTO_S3_REGION: ${S3_REGION:-}
+      PONTO_S3_PREFIX: ${S3_PREFIX:-fotos/}
+      PONTO_S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
+      PONTO_S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
+      PONTO_S3_SSE: ${S3_SSE:-AES256}
+      PONTO_S3_PATH_STYLE: ${S3_PATH_STYLE:-false}
+      PONTO_SIGNING_P12_PATH: ${SIGNING_P12_PATH:-}
+      PONTO_SIGNING_P12_PASSWORD: ${SIGNING_P12_PASSWORD:-}
+      # 2FA: chave que cifra os segredos TOTP no banco (mantenha estável e guarde com backup) e perfis obrigados a usar 2FA
+      PONTO_TOTP_KEY: ${TOTP_KEY:-}
+      PONTO_REQUIRE_2FA_ROLES: ${REQUIRE_2FA_ROLES:-}
+      # IP real do cliente vem do Caddy (auditoria e limite de login): aceitar o cabeçalho só da rede interna.
+      FORWARDED_ALLOW_IPS: 172.29.0.0/24
+      WEB_CONCURRENCY: ${WEB_CONCURRENCY:-1}
+    volumes:
+      # certificado ICP-Brasil (PKCS#12), somente leitura; deixe a pasta vazia enquanto não houver certificado
+      - ./secrets:/run/secrets/ponto:ro
+      - photos:/data/photos
+    networks: [internal]
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on: [app]
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: "${DOMAIN:?defina DOMAIN (ex.: ponto.suaempresa.com.br)}"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    networks: [internal]
+
+  backup:
+    image: postgres:18
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGHOST: db
+      PGUSER: ponto_owner
+      PGPASSWORD: ${OWNER_DB_PASSWORD}
+      PGDATABASE: ponto
+      BACKUP_DIR: /backups
+      BACKUP_INTERVAL_HOURS: ${BACKUP_INTERVAL_HOURS:-1}
+      BACKUP_KEEP: ${BACKUP_KEEP:-336}
+    volumes:
+      - ./backup:/scripts:ro
+      - backups:/backups
+    entrypoint: ["bash", "/scripts/backup.sh"]
+    networks: [internal]
+
+volumes:
+  pgdata:
+  caddy_data:
+  backups:
+  photos:
+
+networks:
+  internal:
+    ipam:
+      config:
+        - subnet: 172.29.0.0/24

@@ -1,0 +1,16 @@
+# HTTPS automático (Let's Encrypt) para o domínio em $DOMAIN. As portas 80 e 443 precisam estar abertas.
+{$DOMAIN} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+
+	# O service worker e o index.html nunca devem ficar em cache do navegador/CDN (a aplicação já envia no-cache).
+	reverse_proxy app:8000 {
+		health_uri /api/ready
+		health_interval 15s
+		# o Caddy já acrescenta X-Forwarded-For/Proto; o uvicorn confia neles só desta rede (FORWARDED_ALLOW_IPS)
+	}
+}

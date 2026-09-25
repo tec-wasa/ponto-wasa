@@ -1,0 +1,11 @@
+target-version = "py312"
+line-length = 140
+extend-exclude = ["migrations/versions"]
+
+[lint]
+# Padrão do ruff (E4, E7, E9, F) + imports ordenados, bugs comuns e simplificações seguras
+select = ["E4", "E7", "E9", "F", "I", "B", "UP"]
+ignore = ["B008", "UP007"]  # B008: Depends() em argumentos é o padrão do FastAPI
+
+[lint.per-file-ignores]
+"tests/*" = ["E741"]  # `l` como nome de linha de arquivo nos testes de leiaute

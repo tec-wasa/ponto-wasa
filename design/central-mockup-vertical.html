@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Central do Ponto — mockup (vertical)</title>
+<style>
+/* Fontes do projeto (design.md). Se o arquivo não for achado, cai para a fonte do sistema. */
+@font-face { font-family: "Space Grotesk"; font-weight: 500; src: url("../frontend/node_modules/@fontsource/space-grotesk/files/space-grotesk-latin-500-normal.woff2") format("woff2"); }
+@font-face { font-family: "Space Grotesk"; font-weight: 700; src: url("../frontend/node_modules/@fontsource/space-grotesk/files/space-grotesk-latin-700-normal.woff2") format("woff2"); }
+@font-face { font-family: "Public Sans"; font-weight: 400; src: url("../frontend/node_modules/@fontsource/public-sans/files/public-sans-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "Public Sans"; font-weight: 600; src: url("../frontend/node_modules/@fontsource/public-sans/files/public-sans-latin-600-normal.woff2") format("woff2"); }
+@font-face { font-family: "Public Sans"; font-weight: 700; src: url("../frontend/node_modules/@fontsource/public-sans/files/public-sans-latin-700-normal.woff2") format("woff2"); }
+
+:root {
+  --font-display: "Space Grotesk", system-ui, sans-serif; --font-body: "Public Sans", system-ui, sans-serif;
+  --bg: #F6F3EC; --surface: #fff; --border: rgba(30,35,32,.09); --text: #1E2320; --muted: #5B6660; --faint: #6F7872; --disabled: #B7BDB9;
+  --accent: #2F6B5B; --accent-on: #fff; --warn-bg: #FBF0DF; --warn: #8A5B1F; --ok: #3F8F6B; --brk: #C98A3E; --avatar-bg: #DCE7E1; --avatar-text: #2F4A40; --danger: #B3372F; --danger-bg: #FBE7E4;
+}
+:root[data-theme="dark"] {
+  --bg: #14171A; --surface: #1B1F23; --border: rgba(255,255,255,.09); --text: #EDEAE3; --muted: #9AA39D; --faint: #8A928C; --disabled: #5A625C;
+  --accent: #5FA98D; --accent-on: #0E1210; --warn-bg: #3A2C18; --warn: #E3A968; --ok: #5FA98D; --brk: #E3A968; --avatar-bg: #24322C; --avatar-text: #8FD9BB; --danger: #EE8C86; --danger-bg: #3A1F1D;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: #d9d6ce; font: 15px/1.5 var(--font-body); color: var(--text); }
+:root[data-theme="dark"] body { background: #0b0d0f; }
+button { font: inherit; color: inherit; cursor: pointer; }
+
+/* Barra do protótipo (fora do aparelho) */
+.proto { max-width: 760px; margin: 0 auto; padding: 16px 20px 0; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.proto h1 { font: 700 18px var(--font-display); margin: 0 12px 0 0; color: var(--text); }
+.proto button { min-height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); font-size: 13px; font-weight: 600; }
+.proto button.on { background: var(--accent); color: var(--accent-on); border-color: var(--accent); }
+.proto .sp { flex: 1; }
+
+/* Aparelho: tablet paisagem 1280x800 (escala para caber) */
+.stage { max-width: 760px; margin: 12px auto 0; padding: 0 20px; }
+.device { width: 100%; aspect-ratio: 10 / 16; background: var(--bg); border-radius: 28px; border: 10px solid #22262a; overflow: hidden; position: relative; display: flex; flex-direction: column; container-type: inline-size; box-shadow: 0 20px 60px rgba(0,0,0,.25); }
+.top { display: flex; align-items: center; justify-content: space-between; padding: 2.17cqw 3.72cqw; border-bottom: 1px solid var(--border); background: var(--surface); }
+.brand { font: 700 3.1cqw var(--font-display); letter-spacing: -.01em; }
+.brand small { font: 500 1.63cqw var(--font-body); color: var(--muted); margin-left: 1.55cqw; }
+.status { display: flex; gap: 1.55cqw; font-size: 1.63cqw; color: var(--muted); align-items: center; }
+.pill { display: inline-flex; align-items: center; gap: .7.75cqw; padding: .6.2cqw 1.55cqw; border-radius: 999px; background: var(--avatar-bg); color: var(--avatar-text); font-weight: 600; font-size: 1.63cqw; }
+.pill.warn { background: var(--warn-bg); color: var(--warn); }
+.dot { width: .12.4cqw; height: .12.4cqw; border-radius: 50%; background: var(--ok); display: inline-block; }
+.screen { position: relative; flex: 1; display: none; padding: 3.72cqw 4.65cqw; min-height: 0; }
+.screen.on { display: flex; }
+.center { align-items: center; justify-content: center; flex-direction: column; text-align: center; }
+
+.clock { font: 700 14.72cqw/1 var(--font-display); letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+.date { font-size: 2.63cqw; color: var(--muted); margin-top: .9.3cqw; }
+.btn { border: 0; border-radius: 3.41cqw; background: var(--accent); color: var(--accent-on); font: 700 3.26cqw var(--font-display); padding: 2.94cqw 5.58cqw; min-height: 10.85cqw; }
+.btn.ghost { background: var(--surface); color: var(--text); border: 1px solid var(--border); font-family: var(--font-body); font-weight: 600; }
+.btn.small { min-height: 8.37cqw; padding: 1.55cqw 3.72cqw; font-size: 2.33cqw; border-radius: 2.48cqw; }
+.actions { display: flex; gap: 2.48cqw; margin-top: 4.65cqw; }
+.hint { color: var(--muted); font-size: 2.09cqw; margin-top: 2.17cqw; }
+.title { font: 700 4.65cqw/1.15 var(--font-display); letter-spacing: -.02em; margin: 0 0 .12.4cqw; }
+.sub { color: var(--muted); font-size: 2.33cqw; margin: 0; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 4.65cqw; width: 100%; align-items: center; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 3.1cqw; padding: 3.1cqw; }
+
+/* QR */
+.viewfinder { position: relative; width: 46.5cqw; height: 46.5cqw; border-radius: 3.72cqw; background: repeating-linear-gradient(45deg, #2a2f33 0 10px, #23282b 10px 20px); margin: 0 auto; overflow: hidden; }
+.viewfinder::before, .viewfinder::after { content: ""; position: absolute; inset: 4.65cqw; border: .69.75cqw solid var(--accent); border-radius: 2.17cqw; clip-path: polygon(0 0, 30% 0, 30% 4%, 4% 4%, 4% 30%, 0 30%, 0 0, 0 70%, 4% 70%, 4% 96%, 30% 96%, 30% 100%, 0 100%, 100% 100%, 100% 70%, 96% 70%, 96% 96%, 70% 96%, 70% 100%, 100% 100%, 100% 0, 70% 0, 70% 4%, 96% 4%, 96% 30%, 100% 30%); border-color: var(--accent); }
+.scanline { position: absolute; left: 4.65cqw; right: 4.65cqw; height: .54.25cqw; background: var(--accent); box-shadow: 0 0 2.17cqw var(--accent); top: 6.2cqw; animation: scan 2.2s ease-in-out infinite alternate; }
+@keyframes scan { to { top: 38.75cqw; } }
+.fakeqr { position: absolute; inset: 12.4cqw; background: conic-gradient(from 90deg, #fff 25%, #111 0 50%, #fff 0 75%, #111 0); background-size: 3.72cqw 3.72cqw; border-radius: .9.3cqw; opacity: .92; }
+
+/* Teclado */
+.keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.55cqw; width: 46.5cqw; }
+.key { min-height: 9.92cqw; border-radius: 2.48cqw; border: 1px solid var(--border); background: var(--surface); font: 700 4.03cqw var(--font-display); }
+.key.act { background: var(--avatar-bg); color: var(--avatar-text); font-size: 2.48cqw; font-family: var(--font-body); }
+.display { font: 700 5.58cqw var(--font-display); letter-spacing: .04em; min-height: 8.68cqw; background: var(--surface); border: 1px solid var(--border); border-radius: 2.79cqw; padding: 1.55cqw 3.1cqw; width: 100%; text-align: center; font-variant-numeric: tabular-nums; }
+.seg { display: inline-flex; padding: .9.3cqw; border-radius: 999px; background: var(--surface); border: 1px solid var(--border); margin-bottom: 3.1cqw; }
+.seg button { border: 0; background: none; min-height: 8.68cqw; padding: 0 5.27cqw; border-radius: 999px; font-size: 2.63cqw; font-weight: 600; color: var(--muted); }
+.seg button.on { background: var(--avatar-bg); color: var(--avatar-text); }
+.pin { display: flex; gap: 2.17cqw; justify-content: center; margin: 2.17cqw 0; }
+.pin i { width: 3.72cqw; height: 3.72cqw; border-radius: 50%; border: .38.75cqw solid var(--faint); }
+.pin i.f { background: var(--accent); border-color: var(--accent); }
+
+/* Pessoa / etapas */
+.avatar { width: 13.95cqw; height: 13.95cqw; border-radius: 50%; background: var(--avatar-bg); color: var(--avatar-text); display: flex; align-items: center; justify-content: center; font: 700 5.27cqw var(--font-display); margin: 0 auto 2.17cqw; }
+.steps { display: flex; gap: .12.4cqw; justify-content: center; margin-bottom: 2.48cqw; }
+.steps span { font-size: 1.78cqw; padding: .54.25cqw 1.55cqw; border-radius: 999px; background: var(--surface); border: 1px solid var(--border); color: var(--faint); font-weight: 600; }
+.steps span.on { background: var(--accent); color: var(--accent-on); border-color: var(--accent); }
+.steps span.done { color: var(--ok); }
+.next { display: inline-flex; align-items: center; gap: 1.55cqw; padding: 1.55cqw 3.1cqw; border-radius: 999px; background: var(--avatar-bg); color: var(--avatar-text); font-weight: 700; font-size: 2.48cqw; margin: 1.55cqw 0 3.1cqw; }
+.timeline { display: flex; gap: 1.55cqw; justify-content: center; margin: 2.17cqw 0; }
+.timeline div { text-align: center; font-size: 1.78cqw; color: var(--faint); min-width: 13.95cqw; }
+.timeline b { display: flex; width: 5.27cqw; height: 5.27cqw; margin: 0 auto .6.2cqw; border-radius: 50%; border: .3.1cqw solid var(--border); align-items: center; justify-content: center; font: 700 2.17cqw var(--font-display); }
+.timeline .d b { background: var(--avatar-bg); color: var(--avatar-text); border-color: transparent; }
+.timeline .d { color: var(--text); }
+
+/* Foto */
+.cam { position: relative; width: 40.3cqw; height: 40.3cqw; border-radius: 50%; margin: 0 auto; overflow: hidden; background: linear-gradient(160deg, #3b4a47, #1f2b29); border: .9.3cqw solid var(--accent); }
+.cam .head { position: absolute; left: 50%; top: 24%; width: 13.95cqw; height: 13.95cqw; border-radius: 50%; background: #c9a98f; transform: translateX(-50%); }
+.cam .body { position: absolute; left: 50%; top: 58%; width: 27.9cqw; height: 21.7cqw; border-radius: 50% 50% 0 0; background: #4d6b62; transform: translateX(-50%); }
+.count { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font: 700 13.95cqw var(--font-display); color: #fff; text-shadow: 0 .6.2cqw 3.1cqw rgba(0,0,0,.5); }
+.flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
+.flash.go { animation: flash .5s ease-out; }
+@keyframes flash { 0% { opacity: .9; } 100% { opacity: 0; } }
+.chips { display: flex; gap: 1.55cqw; justify-content: center; margin-top: 2.48cqw; flex-wrap: wrap; }
+
+/* Sucesso / erro */
+.check { width: 17.05cqw; height: 17.05cqw; border-radius: 50%; background: var(--ok); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 9.3cqw; margin: 0 auto 2.48cqw; }
+.check.err { background: var(--danger); }
+.receipt { font-size: 1.94cqw; color: var(--muted); margin-top: 2.17cqw; }
+.receipt code { font-family: ui-monospace, monospace; }
+.bar { position: absolute; left: 0; bottom: 0; height: .10.85cqw; background: var(--accent); width: 100%; transform-origin: left; }
+.bar.run { animation: shrink 8s linear forwards; }
+@keyframes shrink { to { transform: scaleX(0); } }
+.alert { background: var(--danger-bg); color: var(--danger); border-radius: 2.17cqw; padding: 1.55cqw 2.79cqw; font-weight: 600; font-size: 2.17cqw; margin-top: 1.86cqw; }
+.footer { display: flex; justify-content: space-between; padding: .13.95cqw 3.72cqw; font-size: 1.63cqw; color: var(--faint); border-top: 1px solid var(--border); background: var(--surface); }
+
+
+.proto .lnk { font-size: 13px; font-weight: 600; color: var(--text); padding: 8px 14px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); text-decoration: none; }
+/* Retrato: tudo em UMA coluna, ações empilhadas, teclado centralizado */
+.row2 { grid-template-columns: 1fr; gap: 3.5cqw; justify-items: center; text-align: center; }
+.actions { flex-direction: column; align-items: stretch; width: 100%; max-width: 70cqw; }
+.actions .btn { width: 100%; }
+.status { flex-wrap: wrap; justify-content: flex-end; }
+.footer span:last-child { display: none; }
+.center .actions { margin-top: 4cqw; }
+.viewfinder { width: 58cqw; height: 58cqw; }
+.scanline { animation-name: scanv; } @keyframes scanv { to { top: 51cqw; } }
+.keypad { width: 60cqw; }
+.cam { width: 56cqw; height: 56cqw; }
+.timeline div { min-width: 15cqw; }
+.steps { flex-wrap: wrap; } .steps span { white-space: nowrap; font-size: 1.7cqw; padding: .6cqw 1.6cqw; }
+.row2 { align-content: center; }
+.row2 > div { width: 100%; max-width: 84cqw; }
+.actions { max-width: 100%; }
+/* Leitura do QR no retrato: etapas no topo, depois o visor, o texto e os botões, todos na mesma largura */
+#s-qr .row2 { display: flex; flex-direction: column; align-items: center; gap: 3cqw; }
+#s-qr .row2 > div:last-child { display: contents; }
+#s-qr .steps { order: -1; }
+#s-qr .title, #s-qr .sub, #s-qr .actions { width: 100%; max-width: 84cqw; }
+#s-qr .row2 > div:first-child { width: auto; }
+
+/* Notas do protótipo */
+.notes { max-width: 760px; margin: 16px auto 40px; padding: 0 20px; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.notes .n { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 14px 16px; font-size: 13.5px; color: var(--muted); }
+.notes h3 { margin: 0 0 6px; font: 700 14px var(--font-display); color: var(--text); }
+</style>
+</head>
+<body>
+<div class="proto">
+  <h1>Central do Ponto · mockup vertical</h1>
+  <button data-go="idle">1 Espera</button>
+  <button data-go="qr">2a Ler QR</button>
+  <button data-go="code">2b Código / CPF</button>
+  <button data-go="pin">3 PIN</button>
+  <button data-go="confirm">4 Confirmar</button>
+  <button data-go="photo">5 Foto</button>
+  <button data-go="done">6 Registrado</button>
+  <button data-go="error">Erro</button>
+  <span class="sp"></span>
+  <a href="central-mockup-vertical.html" style="font-size:13px;font-weight:600;color:var(--text);padding:8px 14px;border-radius:999px;border:1px solid var(--border);background:var(--surface);text-decoration:none">Ver vertical</a>
+  <a href="central-mockup.html" class="lnk">Ver horizontal</a>
+  <button id="theme">Tema escuro</button>
+</div>
+
+<div class="stage">
+<div class="device" id="device">
+  <div class="top">
+    <div class="brand">Ponto<small>Central · Sede SP</small></div>
+    <div class="status">
+      <span class="pill"><span class="dot"></span>Hora sincronizada</span>
+      <span class="pill" id="geo">Local verificado · 12 m do posto</span>
+    </div>
+  </div>
+
+  <!-- 1 ESPERA -->
+  <section class="screen center on" id="s-idle">
+    <div class="clock" id="clock">08:02</div>
+    <div class="date" id="date">Sexta-feira, 25 de setembro</div>
+    <div class="actions">
+      <button class="btn" data-go="qr">Aproxime o QR Code do crachá</button>
+      <button class="btn ghost" data-go="code">Digitar código ou CPF</button>
+    </div>
+    <p class="hint">Toque em qualquer opção para começar · a tela volta a esta página sozinha</p>
+  </section>
+
+  <!-- 2a QR -->
+  <section class="screen" id="s-qr">
+    <div class="row2">
+      <div>
+        <div class="viewfinder"><div class="fakeqr"></div><div class="scanline"></div></div>
+      </div>
+      <div>
+        <div class="steps"><span class="on">1 Identificar</span><span>2 Confirmar</span><span>3 Foto</span></div>
+        <h2 class="title">Mostre seu QR Code</h2>
+        <p class="sub">Use o crachá impresso ou o QR do seu aplicativo (Ponto → Meu crachá). O do aplicativo muda a cada 30 segundos e não vale se for uma foto da tela.</p>
+        <div class="actions"><button class="btn small" data-go="pin">Simular leitura</button><button class="btn small ghost" data-go="code">Digitar código ou CPF</button><button class="btn small ghost" data-go="idle">Cancelar</button></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2b CODIGO -->
+  <section class="screen" id="s-code">
+    <div class="row2">
+      <div style="text-align:center">
+        <div class="steps"><span class="on">1 Identificar</span><span>2 Confirmar</span><span>3 Foto</span></div>
+        <div class="seg" id="mode"><button class="on" data-mode="code">Código interno</button><button data-mode="cpf">CPF</button></div>
+        <div class="display" id="disp">&nbsp;</div>
+        <p class="hint" id="modehint">Código de 4 a 8 dígitos do seu crachá</p>
+      </div>
+      <div style="display:flex;justify-content:center;flex-direction:column;align-items:center;gap:2.17cqw">
+        <div class="keypad" id="pad"></div>
+        <div class="actions" style="margin-top:.9.3cqw"><button class="btn small" id="go-code">Continuar</button><button class="btn small ghost" data-go="idle">Cancelar</button></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3 PIN -->
+  <section class="screen" id="s-pin">
+    <div class="row2">
+      <div style="text-align:center">
+        <div class="steps"><span class="done">1 Identificar ✓</span><span class="on">2 Confirmar</span><span>3 Foto</span></div>
+        <div class="avatar">AS</div>
+        <h2 class="title">Olá, Ana</h2>
+        <p class="sub">Digite seu PIN de 4 dígitos para confirmar que é você.</p>
+        <div class="pin" id="pins"><i></i><i></i><i></i><i></i></div>
+        <div class="alert" id="pinerr" style="display:none">PIN incorreto. Restam 2 tentativas.</div>
+      </div>
+      <div style="display:flex;justify-content:center;flex-direction:column;align-items:center;gap:2.17cqw">
+        <div class="keypad" id="pinpad"></div>
+        <div class="actions" style="margin-top:.9.3cqw"><button class="btn small ghost" data-go="idle">Não sou a Ana</button></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4 CONFIRMAR -->
+  <section class="screen center" id="s-confirm">
+    <div class="steps"><span class="done">1 Identificar ✓</span><span class="done">2 Confirmar ✓</span><span class="on">3 Foto</span></div>
+    <div class="avatar">AS</div>
+    <h2 class="title">Ana Souza</h2>
+    <div class="next"><span>Próxima batida:</span> <span>2ª · Intervalo</span></div>
+    <div class="timeline">
+      <div class="d"><b>1</b>Entrada<br>08:02</div><div><b>2</b>Intervalo</div><div><b>3</b>Retorno</div><div><b>4</b>Saída</div>
+    </div>
+    <div class="actions" style="margin-top:1.86cqw">
+      <button class="btn" data-go="photo">Registrar e tirar foto</button>
+      <button class="btn ghost" data-go="idle">Não sou a Ana</button>
+    </div>
+    <p class="hint">Sua foto ajuda o RH a conferir o registro e é apagada quando o mês é fechado.</p>
+  </section>
+
+  <!-- 5 FOTO -->
+  <section class="screen center" id="s-photo">
+    <div class="steps"><span class="done">1 Identificar ✓</span><span class="done">2 Confirmar ✓</span><span class="on">3 Foto</span></div>
+    <div class="cam"><div class="head"></div><div class="body"></div><div class="count" id="count">3</div><div class="flash" id="flash"></div></div>
+    <p class="sub" style="margin-top:2.17cqw" id="camtxt">Olhe para a câmera. A foto é tirada em 3 segundos.</p>
+    <div class="chips"><span class="pill">Local: Sede São Paulo · 12 m</span><span class="pill">2ª · Intervalo</span></div>
+    <div class="actions" style="margin-top:2.17cqw"><button class="btn small" id="shoot">Tirar agora</button><button class="btn small ghost" data-go="done" data-nophoto="1">Registrar sem foto</button></div>
+  </section>
+
+  <!-- 6 SUCESSO -->
+  <section class="screen center" id="s-done">
+    <div class="check">✓</div>
+    <h2 class="title">Intervalo registrado às <span id="donetime">12:01</span></h2>
+    <p class="sub">Ana Souza · 2ª batida de 4</p>
+    <div class="timeline">
+      <div class="d"><b>1</b>Entrada<br>08:02</div><div class="d"><b>2</b>Intervalo<br><span id="donetime2">12:01</span></div><div><b>3</b>Retorno</div><div><b>4</b>Saída</div>
+    </div>
+    <p class="receipt">NSR <b>4821</b> · hash <code>9f3a…c81e</code> · <span id="photonote">foto anexada</span> · comprovante disponível no aplicativo (Registros)</p>
+    <div class="actions" style="margin-top:1.86cqw"><button class="btn small" data-go="idle">Concluir</button></div>
+    <div class="bar" id="bar"></div>
+  </section>
+
+  <!-- ERRO -->
+  <section class="screen center" id="s-error">
+    <div class="check err">!</div>
+    <h2 class="title">Jornada encerrada</h2>
+    <p class="sub">A saída de hoje já foi registrada, então não há outra batida. Se precisar corrigir algo, peça um ajuste no aplicativo ou ao RH.</p>
+    <div class="actions"><button class="btn" data-go="idle">Voltar ao início</button></div>
+    <div class="alert">Outros avisos possíveis: código não encontrado · PIN bloqueado por 5 min · central sem conexão · relógio fora de sincronismo</div>
+  </section>
+
+  <div class="footer"><span>Aparelho <b>CT-01</b> · versão 0.4 · registrado por Rita RH em 12/09</span><span>Modo central: cada pessoa se identifica antes de cada batida</span></div>
+</div>
+</div>
+
+<div class="notes">
+  <div class="n"><h3>Identificação</h3>QR do crachá (fixo, com PIN) ou do aplicativo (rotativo, 30 s); alternativa por código interno ou CPF, sempre com PIN. Nenhuma lista de pessoas na tela: só se digita o próprio código.</div>
+  <div class="n"><h3>Registro completo</h3>Batida (NSR, hash, comprovante) + foto (se a pessoa consentiu) + local (posto fixo do aparelho, conferido por GPS). Foto ou GPS falhando nunca impede a batida.</div>
+  <div class="n"><h3>Tela pública</h3>Sem dados de terceiros, volta sozinha à espera (8 s após registrar, 30 s parada), letras grandes, alvos ≥ 64 px, sem rolagem.</div>
+  <div class="n"><h3>Controle</h3>Aparelho cadastrado e revogável pelo administrador; tentativas de PIN limitadas; origem "Central CT-01" aparece no Espelho e na auditoria.</div>
+</div>
+
+<script>
+const $ = (s) => document.querySelector(s), $$ = (s) => [...document.querySelectorAll(s)];
+let timers = [];
+function show(id) {
+  timers.forEach(clearTimeout); timers = [];
+  $$(".screen").forEach((s) => s.classList.toggle("on", s.id === "s-" + id));
+  $$(".proto [data-go]").forEach((b) => b.classList.toggle("on", b.dataset.go === id));
+  if (id === "idle") { code = ""; pin = ""; renderCode(); renderPin(); $("#pinerr").style.display = "none"; }
+  if (id === "photo") startCountdown();
+  if (id === "done") { $("#bar").classList.remove("run"); void $("#bar").offsetWidth; $("#bar").classList.add("run"); timers.push(setTimeout(() => show("idle"), 8000)); }
+}
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-go]"); if (!b) return;
+  if (b.dataset.nophoto) { $("#photonote").textContent = "sem foto"; } else if (b.dataset.go === "done") { $("#photonote").textContent = "foto anexada"; }
+  show(b.dataset.go);
+});
+
+// relógio
+function tick() {
+  const d = new Date();
+  $("#clock").textContent = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  const t = d.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" });
+  $("#date").textContent = t.charAt(0).toUpperCase() + t.slice(1);
+  $("#donetime").textContent = $("#donetime2").textContent = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+}
+tick(); setInterval(tick, 1000);
+
+// teclado de código/CPF
+let code = "", mode = "code", pin = "";
+function keypad(el, onKey) {
+  el.innerHTML = "";
+  ["1","2","3","4","5","6","7","8","9","⌫","0","OK"].forEach((k) => {
+    const b = document.createElement("button"); b.className = "key" + (k.length > 1 || k === "⌫" ? " act" : ""); b.textContent = k;
+    b.onclick = () => onKey(k); el.appendChild(b);
+  });
+}
+function fmtCpf(d) { return d.replace(/^(\d{3})(\d)/, "$1.$2").replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3").replace(/\.(\d{3})(\d)/, ".$1-$2"); }
+function renderCode() { $("#disp").innerHTML = code ? (mode === "cpf" ? fmtCpf(code) : code) : "&nbsp;"; }
+keypad($("#pad"), (k) => {
+  if (k === "⌫") code = code.slice(0, -1); else if (k === "OK") { if (code.length >= 4) show("pin"); return; }
+  else if (code.length < (mode === "cpf" ? 11 : 8)) code += k;
+  renderCode();
+});
+$("#go-code").onclick = () => { if (code.length >= 4) show("pin"); else { $("#disp").innerHTML = "<span style='color:var(--danger);font-size:2.48cqw'>Digite ao menos 4 dígitos</span>"; setTimeout(renderCode, 1400); } };
+$$("#mode button").forEach((b) => b.onclick = () => {
+  mode = b.dataset.mode; code = ""; renderCode();
+  $$("#mode button").forEach((x) => x.classList.toggle("on", x === b));
+  $("#modehint").textContent = mode === "cpf" ? "CPF com 11 dígitos, só números" : "Código de 4 a 8 dígitos do seu crachá";
+});
+
+// PIN
+function renderPin() { $$("#pins i").forEach((i, n) => i.classList.toggle("f", n < pin.length)); }
+keypad($("#pinpad"), (k) => {
+  if (k === "⌫") pin = pin.slice(0, -1);
+  else if (k === "OK") { return; }
+  else if (pin.length < 4) pin += k;
+  renderPin();
+  if (pin.length === 4) {
+    if (pin === "0000") { $("#pinerr").style.display = "block"; pin = ""; setTimeout(renderPin, 300); }
+    else { $("#pinerr").style.display = "none"; setTimeout(() => show("confirm"), 250); }
+  }
+});
+
+// foto: contagem 3-2-1
+function startCountdown() {
+  let n = 3; $("#count").textContent = n; $("#camtxt").textContent = "Olhe para a câmera. A foto é tirada em 3 segundos.";
+  const step = () => { n--; if (n > 0) { $("#count").textContent = n; timers.push(setTimeout(step, 1000)); } else shoot(); };
+  timers.push(setTimeout(step, 1000));
+}
+function shoot() {
+  timers.forEach(clearTimeout); timers = [];
+  $("#count").textContent = ""; const f = $("#flash"); f.classList.remove("go"); void f.offsetWidth; f.classList.add("go");
+  $("#camtxt").textContent = "Foto registrada."; timers.push(setTimeout(() => show("done"), 900));
+}
+$("#shoot").onclick = shoot;
+
+// tema
+$("#theme").onclick = () => {
+  const dark = document.documentElement.dataset.theme !== "dark";
+  document.documentElement.dataset.theme = dark ? "dark" : "light"; $("#theme").textContent = dark ? "Tema claro" : "Tema escuro";
+};
+show("idle");
+</script>
+</body>
+</html>

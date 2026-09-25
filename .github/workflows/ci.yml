@@ -1,0 +1,143 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_call: # reutilizado pelo release.yml: nada é publicado sem passar aqui
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend (lint + testes SQLite e PostgreSQL)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: ponto
+          POSTGRES_PASSWORD: ponto
+          POSTGRES_DB: ponto_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U ponto -d ponto_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.txt
+      - name: Cliente PostgreSQL 18 (o pg_dump precisa ser da mesma versão do servidor)
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsS -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          . /etc/os-release
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-18
+          echo "/usr/lib/postgresql/18/bin" >> "$GITHUB_PATH"
+      - run: pip install -r requirements-dev.txt
+      - name: Lint
+        run: ruff check .
+      - name: Testes (SQLite)
+        run: pytest -q
+      - name: Testes (PostgreSQL 18)
+        # NSR sem lacunas sob concorrência, gatilhos de imutabilidade, migrações, papel restrito,
+        # dbinit e backup/restauração. REQUIRE_BACKUP_TESTS: falta de ferramenta vira falha, não "pulado".
+        env:
+          PONTO_TEST_DATABASE_URL: postgresql+psycopg://ponto:ponto@127.0.0.1:5432/ponto_test
+          PGPASSWORD: ponto
+          REQUIRE_BACKUP_TESTS: "1"
+        run: pytest -q
+
+  frontend:
+    name: Front-end (tipos, testes e build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm test
+      - name: Build (inclui a checagem de tipos)
+        run: npm run build
+
+  docker:
+    name: Imagem e implantação (compose)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Construir a imagem
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: ponto:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Imagem roda sem privilégios e responde
+        run: |
+          docker run -d --name ponto-smoke -p 8000:8000 -e PONTO_SECRET_KEY=ci-secret-ci-secret-ci-secret-ci-secret ponto:ci
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8000/api/ready && break; sleep 1; done
+          curl -fsS http://127.0.0.1:8000/api/health
+          curl -fsS http://127.0.0.1:8000/ | grep -q '<div id="root">'          # o front-end compilado é servido
+          curl -fsSI http://127.0.0.1:8000/api/health | grep -i "content-security-policy"
+          test "$(docker exec ponto-smoke id -u)" != "0"                          # não roda como root
+          # docs desligadas em produção: o esquema da API não pode vazar (o fallback do front devolve só HTML)
+          ! curl -fsS http://127.0.0.1:8000/openapi.json | grep -q '"openapi"'
+          docker logs ponto-smoke 2>&1 | head -5
+          docker rm -f ponto-smoke
+      - name: Subir a pilha (banco -> migração -> aplicação) com o papel restrito
+        env:
+          PONTO_IMAGE: ponto:ci
+          DOMAIN: ci.exemplo.local
+          OWNER_DB_PASSWORD: ci-owner-password-0123456789
+          APP_DB_PASSWORD: ci-app-password-0123456789
+          SECRET_KEY: ci-secret-ci-secret-ci-secret-ci-secret
+        run: |
+          mkdir -p deploy/secrets
+          docker compose -f deploy/docker-compose.yml config --quiet
+          docker compose -f deploy/docker-compose.yml up -d --wait db app
+          docker compose -f deploy/docker-compose.yml exec -T app python -m app.seed \
+            --name "Empresa CI" --cnpj 12.345.678/0001-90 --email admin@ci.local --password "senha-forte-123" --cpf 529.982.247-25
+          docker compose -f deploy/docker-compose.yml exec -T app python -m app.integrity
+          docker compose -f deploy/docker-compose.yml logs migrate app | tail -20
+          docker compose -f deploy/docker-compose.yml down -v
+
+  security:
+    name: Auditoria de dependências (informativa)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - run: pip install pip-audit && pip-audit -r backend/requirements.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - run: npm audit --omit=dev --audit-level=high
+        working-directory: frontend
