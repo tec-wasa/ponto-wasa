@@ -11,7 +11,7 @@ CARD_W, CARD_H, MARGIN_X, MARGIN_Y, GAP = 90, 60, 10, 12, 4  # mm: 2 colunas x 4
 
 def _qr_png(payload: str) -> io.BytesIO:
     buf = io.BytesIO()
-    segno.make(payload, error="m").save(buf, kind="png", scale=8, border=2)
+    segno.make(payload, error="m", micro=False).save(buf, kind="png", scale=8, border=2)
     buf.seek(0)
     return buf
 

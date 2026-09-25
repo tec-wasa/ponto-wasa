@@ -489,7 +489,7 @@ def my_rotating_badge(user: User = Depends(get_current_user), db: Session = Depe
     svc.assign_code(db, user)
     payload, expires_in = svc.rotating_badge(user)
     db.commit()
-    return {"qr": payload, "expires_in": expires_in, "image": segno.make(payload, error="m").svg_data_uri(scale=6, border=2)}
+    return {"qr": payload, "expires_in": expires_in, "image": segno.make(payload, error="m", micro=False).svg_data_uri(scale=8, border=4)}
 
 
 class PinIn(BaseModel):

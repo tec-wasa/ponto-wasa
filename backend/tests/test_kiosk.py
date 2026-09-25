@@ -485,3 +485,13 @@ def test_offline_punch_older_than_an_existing_punch_is_rejected(client, world, d
     r = _offline(client, kh, qr, key="k-0000009", minutes_ago=20)  # a do tablet é mais velha que a já registrada
     assert r.status_code == 422 and "posterior" in r.text
     assert db.query(Punch).count() == 1
+
+
+def test_app_badge_qr_is_a_standard_qr_not_a_micro_qr(client, world):
+    """Micro QR (que o segno escolhe sozinho para textos curtos) não é lido por câmeras de celular nem por jsQR/BarcodeDetector."""
+    import re
+    from urllib.parse import unquote
+    r = client.get("/auth/badge-qr", headers=world["emp"]).json()
+    svg = unquote(r["image"].split(",", 1)[1])
+    width = int(re.search(r"width=.([\d.]+)", svg).group(1))
+    assert width >= (21 + 8) * 8  # versão 1 (21 módulos) + 4 de margem de cada lado, 8 px por módulo

@@ -60,7 +60,7 @@ def provisioning_uri(secret_b32: str, account: str, issuer: str = "Ponto") -> st
 
 
 def qr_data_uri(uri: str) -> str:
-    return segno.make(uri, error="m").svg_data_uri(scale=5, border=2)
+    return segno.make(uri, error="m", micro=False).svg_data_uri(scale=5, border=2)
 
 
 # --- segredo criptografado -------------------------------------------------------------------------
