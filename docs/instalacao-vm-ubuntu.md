@@ -20,7 +20,7 @@ Hyper-V: rede em **switch externo** (a VM recebe IP da rede, acessível por tabl
 
 ## 2. Baixar o código e construir a imagem
 ```bash
-git clone https://github.com/dev-wasa/ponto.git && cd ponto
+git clone https://github.com/tec-wasa/ponto-wasa.git && cd ponto-wasa
 git checkout main && git log --oneline | head -1
 docker build -t ponto:local .        # ~3 a 5 min
 ```
@@ -56,5 +56,5 @@ Para dados de demonstração (só teste): `docker compose exec -e PONTO_ALLOW_MI
 
 ## 6. Atualizar a VM
 ```bash
-cd ~/ponto && git pull && docker build -t ponto:local . && cd deploy && docker compose up -d && docker compose exec app python -m app.integrity
+cd ~/ponto-wasa && git pull && docker build -t ponto:local . && cd deploy && docker compose up -d && docker compose exec app python -m app.integrity
 ```
