@@ -10,14 +10,14 @@ COPY frontend/ ./
 RUN npm run build
 
 # --- 2) Dependências Python (camada própria: só reconstrói se requirements.txt mudar) ---------------
-FROM python:3.14-slim AS deps
+FROM python:3.15-slim AS deps
 ENV PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1
 RUN python -m venv /opt/venv
 COPY backend/requirements.txt /tmp/requirements.txt
 RUN /opt/venv/bin/pip install -r /tmp/requirements.txt
 
 # --- 3) Imagem final ------------------------------------------------------------------------------
-FROM python:3.14-slim AS runtime
+FROM python:3.15-slim AS runtime
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PATH="/opt/venv/bin:$PATH" \
     PONTO_LOG_JSON=true PONTO_DOCS_ENABLED=false WEB_CONCURRENCY=1
 # /data/photos: o volume das fotos herda este dono
