@@ -1,0 +1,21 @@
+# Variante SEM Caddy: o HTTPS vem de um Cloudflare Tunnel (o contêiner só faz conexões de saída; nenhuma porta é publicada).
+# Use junto do compose principal, quando a VM já tem outro serviço nas portas 80/443:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.tunnel.yml up -d
+#
+# Na Cloudflare (Zero Trust > Networks > Tunnels > Create tunnel > Cloudflared): copie o token para CLOUDFLARE_TUNNEL_TOKEN no .env
+# e crie o "Public hostname": ponto.<seu domínio>  ->  Service: HTTP  app:8000
+services:
+  caddy:
+    profiles: ["com-caddy"]   # não sobe por padrão
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: "${CLOUDFLARE_TUNNEL_TOKEN:?defina CLOUDFLARE_TUNNEL_TOKEN}"
+    depends_on:
+      app:
+        condition: service_healthy
+    networks: [internal]

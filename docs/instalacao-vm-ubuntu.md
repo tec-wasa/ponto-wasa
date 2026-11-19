@@ -34,7 +34,9 @@ openssl rand -base64 36   # SECRET_KEY e TOTP_KEY (valores diferentes; guarde a 
 ```
 No `.env`: `PONTO_IMAGE=ponto:local`, `DOMAIN=<nome ou IP>`, senhas e chaves acima, `REQUIRE_2FA_ROLES=hr,admin` (opcional).
 
-**HTTPS** (câmera e GPS do navegador exigem): 
+**HTTPS com Cloudflare Tunnel** (VM que já usa 80/443 para outro serviço; câmera e GPS exigem HTTPS): no `.env` ponha `DOMAIN=ponto.<domínio>` e `CLOUDFLARE_TUNNEL_TOKEN=<token>`, e suba com `docker compose -f docker-compose.yml -f docker-compose.tunnel.yml up -d` (nos passos seguintes, use sempre esses dois `-f`). Detalhes no cabeçalho de `deploy/docker-compose.tunnel.yml`.
+
+**Outras opções de HTTPS:** 
 - domínio público com 80/443 acessíveis da internet: o Caddy obtém o Let's Encrypt sozinho;
 - só rede interna: use `tls internal` no Caddyfile (CA própria do Caddy). Cada tablet/celular precisa **instalar e confiar** o certificado raiz (`docker compose cp caddy:/data/caddy/pki/authorities/local/root.crt .`).
 
