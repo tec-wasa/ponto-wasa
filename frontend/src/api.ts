@@ -76,6 +76,7 @@ export async function api<T>(path: string, opts: { method?: string; body?: unkno
     }
     throw new ApiError(res.status, errorMessage(j.detail, res.status), code, j);
   }
+  if (res.status === 204) return undefined as T;
   return res.json();
 }
 

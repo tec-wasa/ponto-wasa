@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from ..db import get_db
 from ..deps import MANAGEMENT_ROLES, client_ip, get_current_user, require_roles
-from ..models import Closing, Company, Punch, Schedule, User
+from ..models import Absence, Adjustment, Closing, Company, HourBankEntry, KioskTicket, Punch, PunchPhoto, Schedule, User
 from ..schemas import (
     ROLES,
     CompanyOut,
@@ -124,6 +124,17 @@ def patch_user(
         raise HTTPException(403, "Somente o administrador altera este usuário")
     if "manager_id" in data:
         _same_company(db, actor, User, data["manager_id"], "Gestor")
+        if data["manager_id"] == user.id:
+            raise HTTPException(422, "A pessoa não pode ser gestora de si mesma")
+    if data.get("email"):
+        data["email"] = data["email"].lower()
+    if data.get("cpf") is not None and data["cpf"] != user.cpf:
+        if db.execute(select(Punch.id).where(Punch.user_id == user.id).limit(1)).first():
+            raise HTTPException(409, "Não é possível alterar o CPF de quem já tem marcações (o CPF faz parte do registro de cada marcação). "
+                                     "Desative esta pessoa e cadastre outra, se o CPF estava errado desde o início, com apoio do jurídico.")
+        if db.execute(select(User.id).where(User.company_id == user.company_id, User.cpf == data["cpf"], User.id != user.id)).first():
+            raise HTTPException(409, "CPF já cadastrado nesta empresa")
+    data = {k: v for k, v in data.items() if not (k in ("email", "cpf") and v is None)}
     if "schedule_id" in data:
         _same_company(db, actor, Schedule, data["schedule_id"], "Jornada")
         if data["schedule_id"] != user.schedule_id:
@@ -134,17 +145,50 @@ def patch_user(
     before = {k: getattr(user, k) for k in data}
     for k, v in data.items():
         setattr(user, k, v)
+    try:
+        db.flush()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, "E-mail já cadastrado") from None
     company = db.get(Company, actor.company_id)
     if data.get("hour_bank_enabled") and not user.hour_bank_start:
         user.hour_bank_start = datetime.now(ZoneInfo(company.timezone)).date()  # o saldo passa a contar a partir de hoje
         data["hour_bank_start"] = user.hour_bank_start
     if "active" in data and before["active"] != data["active"]:
         arp.record_employee(db, company, "I" if data["active"] else "E", user, actor)  # tipo 5: inclusão/exclusão
-    elif "name" in data and before["name"] != data["name"]:
+    elif ("name" in data and before["name"] != data["name"]) or ("cpf" in data and before["cpf"] != data["cpf"]):
         arp.record_employee(db, company, "A", user, actor)  # tipo 5: alteração
     audit.log(db, actor, "update", "user", user.id, before=before, after=data, ip=client_ip(request))
     db.commit()
     return user
+
+
+@router.delete("/users/{user_id}", status_code=204)
+def delete_user(user_id: int, request: Request, actor: User = Depends(require_roles(*MANAGEMENT_ROLES)), db: Session = Depends(get_db)):
+    """Exclui o cadastro de quem NUNCA teve movimentação (cadastro por engano). Quem já tem marcações, ajustes, ausências ou banco de
+    horas não pode ser apagado (são registros trabalhistas, imutáveis por desenho): use "Desativar", que mantém o histórico."""
+    user = _same_company(db, actor, User, user_id, "Usuário")
+    if user.id == actor.id:
+        raise HTTPException(409, "Você não pode excluir o seu próprio cadastro")
+    if user.role in PRIVILEGED + ("auditor",) and actor.role != "admin":
+        raise HTTPException(403, "Somente o administrador exclui este usuário")
+    for model, label in ((Punch, "marcações"), (Adjustment, "ajustes"), (Absence, "ausências"), (HourBankEntry, "lançamentos de banco de horas"),
+                         (PunchPhoto, "fotos")):
+        if db.execute(select(model.id).where(model.user_id == user.id).limit(1)).first():
+            raise HTTPException(409, f"Não é possível excluir: esta pessoa tem {label}. Use Desativar, que mantém o histórico.")
+    if db.execute(select(User.id).where(User.manager_id == user.id).limit(1)).first():
+        raise HTTPException(409, "Esta pessoa é gestora de outras. Troque o gestor delas antes de excluir.")
+    snapshot = {"name": user.name, "email": user.email, "role": user.role}
+    db.query(KioskTicket).filter(KioskTicket.user_id == user.id).delete()
+    arp.record_employee(db, db.get(Company, actor.company_id), "E", user, actor)  # tipo 5: exclusão
+    audit.log(db, actor, "delete", "user", user.id, before=snapshot, ip=client_ip(request))
+    db.delete(user)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, "Esta pessoa ainda é referenciada por outros registros (ex.: fechamentos, lançamentos). Use Desativar.") from None
+    return Response(status_code=204)
 
 
 # --- Jornadas ----------------------------------------------------------------
@@ -192,25 +236,51 @@ def patch_schedule(
     schedule_id: int, body: SchedulePatch, request: Request, actor: User = Depends(require_roles(*MANAGEMENT_ROLES)),
     db: Session = Depends(get_db),
 ):
-    """Liga/desliga "a jornada pode terminar no dia seguinte". O Espelho é calculado a partir das marcações, então a mudança
-    vale também para dias já passados: fica na auditoria, com o antes e o depois."""
+    """Edita a jornada. O nome é livre; as demais regras mudam o cálculo do Espelho (inclusive de dias já passados e ainda abertos):
+    ficam na auditoria com o antes e o depois, e são recusadas se um mês fechado tiver marcações de pessoas desta jornada."""
     sched = db.get(Schedule, schedule_id)
     if not sched or sched.company_id != actor.company_id:
         raise HTTPException(404, "Jornada não encontrada")
-    if not body.crosses_midnight and sched.break_minutes > 0 and sched.break_start <= sched.start_time:
-        raise HTTPException(422, "O início do intervalo é anterior ao início da jornada: só faz sentido em turno que vira a meia-noite")
-    if sched.crosses_midnight != body.crosses_midnight:
+    data = body.model_dump(exclude_unset=True)
+    data = {k: v for k, v in data.items() if v is not None}
+    if "weekdays" in data:
+        if not data["weekdays"] or any(d < 0 or d > 6 for d in data["weekdays"]):
+            raise HTTPException(422, "Dias da semana devem estar entre 0 (segunda) e 6 (domingo), com ao menos um dia")
+        data["weekdays"] = ",".join(str(d) for d in sorted(set(data["weekdays"])))
+    before = {k: getattr(sched, k) for k in data}
+    changes = {k: v for k, v in data.items() if before[k] != v}
+    if not changes:
+        return sched
+    final = {c: changes.get(c, getattr(sched, c)) for c in ("break_minutes", "break_start", "start_time", "crosses_midnight")}
+    if final["break_minutes"] > 0 and not final["crosses_midnight"] and final["break_start"] <= final["start_time"]:
+        raise HTTPException(422, "O início do intervalo deve ser posterior ao início da jornada (exceto em turno que vira a meia-noite)")
+    if set(changes) - {"name"}:
         month = _closed_month_with_punches(
             db, sched.company_id, list(db.execute(select(User.id).where(User.schedule_id == sched.id)).scalars()))
         if month:
             raise HTTPException(409, f"Não é possível alterar: o mês {month} está fechado e tem marcações de pessoas desta jornada. "
-                                     "Reabra o mês (RH ou administrador) antes de mudar a opção.")
-        before = {"crosses_midnight": sched.crosses_midnight}
-        sched.crosses_midnight = body.crosses_midnight
-        audit.log(db, actor, "update", "schedule", sched.id, before=before, after={"crosses_midnight": body.crosses_midnight},
-                  ip=client_ip(request))
-        db.commit()
+                                     "Reabra o mês (RH ou administrador) ou crie uma jornada nova e troque as pessoas a partir de agora.")
+    for k, v in changes.items():
+        setattr(sched, k, v)
+    audit.log(db, actor, "update", "schedule", sched.id, before={k: before[k] for k in changes}, after=changes, ip=client_ip(request))
+    db.commit()
     return sched
+
+
+@router.delete("/schedules/{schedule_id}", status_code=204)
+def delete_schedule(schedule_id: int, request: Request, actor: User = Depends(require_roles(*MANAGEMENT_ROLES)),
+                    db: Session = Depends(get_db)):
+    """Exclui uma jornada que ninguém usa. Em uso: troque a jornada das pessoas antes."""
+    sched = db.get(Schedule, schedule_id)
+    if not sched or sched.company_id != actor.company_id:
+        raise HTTPException(404, "Jornada não encontrada")
+    n = db.execute(select(User.id).where(User.schedule_id == sched.id)).scalars().all()
+    if n:
+        raise HTTPException(409, f"Esta jornada está em uso por {len(n)} pessoa(s). Troque a jornada delas em Pessoas e tente de novo.")
+    audit.log(db, actor, "delete", "schedule", sched.id, before={"name": sched.name}, ip=client_ip(request))
+    db.delete(sched)
+    db.commit()
+    return Response(status_code=204)
 
 
 @router.get("/schedules", response_model=list[ScheduleOut])

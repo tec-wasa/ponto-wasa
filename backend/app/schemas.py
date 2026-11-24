@@ -49,7 +49,9 @@ class UserIn(BaseModel):
 
 
 class UserPatch(BaseModel):
-    name: str | None = None
+    name: str | None = Field(None, min_length=2, max_length=200)
+    email: EmailStr | None = None
+    cpf: str | None = None  # só enquanto a pessoa não tem marcações (correção de cadastro)
     admitted_at: date | None = None
     job_title: str | None = Field(None, max_length=100)
     hour_bank_enabled: bool | None = None
@@ -59,6 +61,15 @@ class UserPatch(BaseModel):
     schedule_id: int | None = None
     active: bool | None = None
     punch_policy: Literal["both", "kiosk"] | None = None
+
+    @field_validator("cpf")
+    @classmethod
+    def _cpf(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        if not is_valid_cpf(v):
+            raise ValueError("CPF inválido")
+        return digits(v)
 
 
 class UserOut(ORM):
@@ -119,7 +130,16 @@ class ScheduleIn(BaseModel):
 
 
 class SchedulePatch(BaseModel):
-    crosses_midnight: bool  # única propriedade editável: as demais mudariam o cálculo de dias já apurados
+    """Qualquer campo pode ser editado; mudar a regra de cálculo (tudo menos o nome) é recusado se um mês fechado tiver
+    marcações de pessoas desta jornada, porque o Espelho é calculado da jornada vigente."""
+    name: str | None = Field(None, min_length=2, max_length=100)
+    weekdays: list[int] | None = None
+    daily_minutes: int | None = Field(None, ge=0, le=720)
+    break_minutes: int | None = Field(None, ge=0, le=240)
+    tolerance_minutes: int | None = Field(None, ge=0, le=10)
+    start_time: str | None = Field(None, pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
+    break_start: str | None = Field(None, pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
+    crosses_midnight: bool | None = None
 
 
 class ScheduleOut(ORM):

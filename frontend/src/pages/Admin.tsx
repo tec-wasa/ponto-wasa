@@ -59,6 +59,7 @@ function Users({ readOnly }: { readOnly: boolean }) {
   const [query, setQuery] = useState("");
   const [showInactive, setShowInactive] = useState(false);
   const [confirm, setConfirm] = useState<string | null>(null); // "<ação>-<id>": confirmação na própria tela
+  const [edit, setEdit] = useState<{ id: number; name: string; email: string; cpf: string; job_title: string } | null>(null);
   const [newSchedule, setNewSchedule] = useState<{ id: number; value: string } | null>(null); // troca de jornada em confirmação
   const [scheduleError, setScheduleError] = useState("");
   const [temp, setTemp] = useState<{ name: string; password: string } | null>(null);
@@ -104,6 +105,38 @@ function Users({ readOnly }: { readOnly: boolean }) {
       setConfirm(null);
       await load();
     } catch (err) {
+      n.fail(err);
+    }
+  }
+
+  async function saveEdit(e: FormEvent) {
+    e.preventDefault();
+    if (!edit) return;
+    const u = users.find((x) => x.id === edit.id)!;
+    const body: Record<string, string> = {};
+    if (edit.name.trim() !== u.name) body.name = edit.name.trim();
+    if (edit.email.trim().toLowerCase() !== u.email) body.email = edit.email.trim();
+    if (edit.cpf.replace(/\D/g, "") !== u.cpf) body.cpf = edit.cpf;
+    if (edit.job_title.trim() !== (u.job_title ?? "")) body.job_title = edit.job_title.trim();
+    if (Object.keys(body).length === 0) return setEdit(null);
+    try {
+      await api(`/users/${u.id}`, { method: "PATCH", body });
+      n.ok("Cadastro atualizado.");
+      setEdit(null);
+      await load();
+    } catch (err) {
+      n.fail(err);
+    }
+  }
+
+  async function removeUser(u: User) {
+    try {
+      await api(`/users/${u.id}`, { method: "DELETE" });
+      n.ok(`${u.name} excluída(o) do cadastro.`);
+      setConfirm(null);
+      await load();
+    } catch (err) {
+      setConfirm(null);
       n.fail(err);
     }
   }
@@ -280,12 +313,25 @@ function Users({ readOnly }: { readOnly: boolean }) {
                     <button onClick={() => download(`/users/${u.id}/badge.pdf`, `cracha-${u.id}.pdf`).catch((e) => n.fail(e))}>Baixar crachá (PDF)</button>
                     {badges[u.id]?.has_pin && <button onClick={() => setConfirm(`pin-${u.id}`)}>Zerar PIN</button>}
                     <button onClick={() => setConfirm(`badge-${u.id}`)}>Regenerar crachá</button>
+                    <button onClick={() => setEdit({ id: u.id, name: u.name, email: u.email, cpf: fmtCpf(u.cpf), job_title: u.job_title ?? "" })}>Editar dados</button>
                     {u.id !== user?.id && <button onClick={() => setConfirm(`pw-${u.id}`)}>Nova senha</button>}
                     {u.id !== user?.id && u.totp_enabled && <button onClick={() => setConfirm(`2fa-${u.id}`)}>Zerar 2FA</button>}
                     {u.id !== user?.id && (
                       <button className={u.active ? "danger" : ""} onClick={() => setConfirm(`act-${u.id}`)}>{u.active ? "Desativar pessoa" : "Reativar pessoa"}</button>
                     )}
+                    {u.id !== user?.id && <button className="danger" onClick={() => setConfirm(`del-${u.id}`)}>Excluir cadastro</button>}
                   </div>
+                  {edit?.id === u.id && (
+                    <form className="card" onSubmit={saveEdit} style={{ marginTop: 8 }} aria-label={`Editar ${u.name}`}>
+                      <label>Nome<input required minLength={2} value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} /></label>
+                      <label>E-mail (usado para entrar)<input type="email" required value={edit.email} onChange={(e) => setEdit({ ...edit, email: e.target.value })} /></label>
+                      <label>CPF<input required inputMode="numeric" value={edit.cpf} onChange={(e) => setEdit({ ...edit, cpf: e.target.value })} /></label>
+                      <p className="muted small" style={{ margin: "0 0 8px" }}>O CPF só pode ser corrigido enquanto a pessoa não tem marcações (ele faz parte de cada registro). Nome e CPF alterados ficam registrados no REP-P (tipo 5).</p>
+                      <label>Cargo ou função<input maxLength={100} value={edit.job_title} onChange={(e) => setEdit({ ...edit, job_title: e.target.value })} /></label>
+                      <div className="row"><button className="primary">Salvar</button><button type="button" onClick={() => setEdit(null)}>Cancelar</button></div>
+                    </form>
+                  )}
+                  <Confirm id={`del-${u.id}`} danger text={`Excluir o cadastro de ${u.name}? Só é possível se a pessoa nunca teve marcações, ajustes, ausências ou banco de horas (cadastro feito por engano). Não dá para desfazer. Quem já trabalhou deve ser desativado ("Desativar pessoa"), para manter o histórico.`} onYes={() => removeUser(u)} />
                   <Confirm id={`pin-${u.id}`} text={`Zerar o PIN de ${u.name}? Ela define outro em Minha conta.`} onYes={() => badgeAction(u, "pin-reset", "PIN zerado.")} />
                   <Confirm id={`badge-${u.id}`} danger text={`Regenerar o crachá de ${u.name}? O QR impresso atual deixa de funcionar na Central; imprima o novo.`} onYes={() => badgeAction(u, "badge/regenerate", "Crachá regenerado: o impresso anterior não vale mais.")} />
                   <Confirm id={`pw-${u.id}`} text={`Gerar uma senha temporária para ${u.name}? A senha atual deixa de valer e as sessões abertas caem.`} onYes={() => resetPassword(u)} />
@@ -354,6 +400,8 @@ function Schedules({ readOnly }: { readOnly: boolean }) {
   const [brkStart, setBrkStart] = useState("12:00");
   const [crosses, setCrosses] = useState(false);
   const [change, setChange] = useState<{ id: number; value: boolean } | null>(null); // confirmação na própria tela
+  const [editing, setEditing] = useState<{ id: number; name: string; days: number[]; hours: string; brk: string; tol: string; start: string; brkStart: string } | null>(null);
+  const [removing, setRemoving] = useState<number | null>(null);
   const n = useNotice();
 
   const load = useCallback(() => api<Schedule[]>("/schedules").then(setList).catch(n.fail), []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -368,6 +416,37 @@ function Schedules({ readOnly }: { readOnly: boolean }) {
       await load();
     } catch (err) {
       setChange(null);
+      n.fail(err);
+    }
+  }
+
+  async function saveSchedule(e: FormEvent) {
+    e.preventDefault();
+    if (!editing) return;
+    try {
+      await api(`/schedules/${editing.id}`, {
+        method: "PATCH",
+        body: {
+          name: editing.name, weekdays: editing.days, daily_minutes: Math.round(Number(editing.hours) * 60), break_minutes: Number(editing.brk),
+          tolerance_minutes: Number(editing.tol), start_time: editing.start, break_start: editing.brkStart,
+        },
+      });
+      n.ok("Jornada atualizada.");
+      setEditing(null);
+      await load();
+    } catch (err) {
+      n.fail(err);
+    }
+  }
+
+  async function removeSchedule(id: number) {
+    try {
+      await api(`/schedules/${id}`, { method: "DELETE" });
+      n.ok("Jornada excluída.");
+      setRemoving(null);
+      await load();
+    } catch (err) {
+      setRemoving(null);
       n.fail(err);
     }
   }
@@ -412,6 +491,40 @@ function Schedules({ readOnly }: { readOnly: boolean }) {
               <input type="checkbox" checked={!!s.crosses_midnight} onChange={(e) => setChange({ id: s.id, value: e.target.checked })} />
               <span>Pode terminar no dia seguinte (turno da noite)</span>
             </label>
+          )}
+          {!readOnly && (
+            <div className="row" style={{ marginTop: 12 }}>
+              <button onClick={() => setEditing({ id: s.id, name: s.name, days: s.weekdays.split(",").filter(Boolean).map(Number), hours: String(s.daily_minutes / 60),
+                brk: String(s.break_minutes), tol: String(s.tolerance_minutes), start: s.start_time, brkStart: s.break_start })}>Editar jornada</button>
+              <button className="danger" onClick={() => setRemoving(s.id)}>Excluir</button>
+            </div>
+          )}
+          {removing === s.id && (
+            <div className="alert info" role="alertdialog" aria-label="Confirmar exclusão da jornada" style={{ marginTop: 8 }}>
+              <p style={{ margin: "0 0 8px" }}>Excluir a jornada “{s.name}”? Só é possível se nenhuma pessoa a usa. Não dá para desfazer.</p>
+              <div className="row"><button className="danger" onClick={() => removeSchedule(s.id)}>Confirmar exclusão</button><button onClick={() => setRemoving(null)}>Voltar</button></div>
+            </div>
+          )}
+          {editing?.id === s.id && (
+            <form className="card" onSubmit={saveSchedule} style={{ marginTop: 8 }} aria-label={`Editar ${s.name}`}>
+              <label>Nome<input required minLength={2} value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} /></label>
+              <p className="section-title">Dias de trabalho</p>
+              <div className="quick" role="group" aria-label="Dias de trabalho">
+                {DAYS.map((d, i) => (
+                  <button type="button" key={d} className={`fchip ${editing.days.includes(i) ? "on" : ""}`} aria-pressed={editing.days.includes(i)}
+                    onClick={() => setEditing({ ...editing, days: editing.days.includes(i) ? editing.days.filter((x) => x !== i) : [...editing.days, i] })}>{d}</button>
+                ))}
+              </div>
+              <div className="grid2 keep">
+                <label>Carga diária (h)<input type="number" min="0" max="12" step="0.25" value={editing.hours} onChange={(e) => setEditing({ ...editing, hours: e.target.value })} /></label>
+                <label>Intervalo (min)<input type="number" min="0" max="240" value={editing.brk} onChange={(e) => setEditing({ ...editing, brk: e.target.value })} /></label>
+                <label>Tolerância (máx. 10)<input type="number" min="0" max="10" value={editing.tol} onChange={(e) => setEditing({ ...editing, tol: e.target.value })} /></label>
+                <label>Primeira entrada<input type="time" required value={editing.start} onChange={(e) => setEditing({ ...editing, start: e.target.value })} /></label>
+                <label>Início do intervalo<input type="time" required value={editing.brkStart} onChange={(e) => setEditing({ ...editing, brkStart: e.target.value })} /></label>
+              </div>
+              <p className="muted small">Só o nome muda sem efeito no cálculo. As demais mudanças valem para o Espelho de dias ainda abertos e são recusadas se um mês fechado tiver marcações de pessoas desta jornada. Tudo fica na auditoria.</p>
+              <div className="row"><button className="primary">Salvar</button><button type="button" onClick={() => setEditing(null)}>Cancelar</button></div>
+            </form>
           )}
           {change?.id === s.id && (
             <div className="alert info" role="alertdialog" aria-label="Confirmar mudança da jornada" style={{ marginTop: 8 }}>

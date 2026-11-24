@@ -20,7 +20,7 @@ $$;
 
 GRANT USAGE ON SCHEMA public TO ponto_app;
 
--- Tabelas mutáveis: sem DELETE (a aplicação desativa registros, não os apaga).
+-- Tabelas mutáveis: sem DELETE (a aplicação desativa registros, não os apaga), exceto as de cadastro abaixo.
 GRANT SELECT, INSERT, UPDATE ON companies, users, schedules, closings, adjustments, absences, nsr_counters, kiosks, kiosk_tickets TO ponto_app;
 
 -- Append-only (ARP e auditoria): somente leitura e inserção.
@@ -28,5 +28,9 @@ GRANT SELECT, INSERT, UPDATE ON companies, users, schedules, closings, adjustmen
 GRANT SELECT, INSERT, DELETE ON punch_photos TO ponto_app;
 
 GRANT SELECT, INSERT ON punches, arp_events, audit_log, hour_bank_entries TO ponto_app;
+
+-- Cadastros que o administrador pode excluir quando não têm histórico (a aplicação confere as regras; marcações, ajustes,
+-- ausências e banco de horas continuam sem DELETE).
+GRANT DELETE ON users, schedules, kiosks, kiosk_tickets TO ponto_app;
 
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO ponto_app;

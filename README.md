@@ -108,6 +108,13 @@ Aplicativo à parte para o tablet compartilhado: abre em `https://<domínio>/cen
 
 Leitores em modo teclado (padrão de fábrica) funcionam na espera e na tela do QR: a leitura rápida de um QR do Ponto identifica a pessoa. Testado só por unidade; falta um leitor real. **Central sem internet (opção C):** só o QR do crachá impresso vale; a batida (QR, foto, hora, posição) fica na fila do aparelho e o servidor confere tudo no envio (`POST /kiosk/offline-punch`); recusas vão para a auditoria e para Divergências da Central. Desligada se a empresa exige PIN. Detalhes e limites em `docs/central-do-ponto.md` (seção 8). NFC não foi feito.
 
+## Editar e excluir cadastros
+
+- **Pessoas:** "Editar dados" (nome, e-mail, CPF, cargo). O CPF só muda enquanto a pessoa não tem marcações; nome e CPF alterados vão para o REP-P (tipo 5). "Excluir cadastro" só vale para quem nunca teve marcações, ajustes, ausências, banco de horas ou fotos (cadastro por engano; gera o evento de exclusão tipo 5). Quem já trabalhou é **desativado**, o que mantém o histórico.
+- **Jornadas:** edição completa. Só o nome muda sem efeito no cálculo; as demais mudanças são recusadas se um mês fechado tiver marcações de pessoas da jornada. Exclusão só de jornada que ninguém usa.
+- **Centrais:** edição de nome, posto e raio; exclusão só depois de revogada (as batidas continuam nos registros).
+- Tudo na auditoria. O papel `ponto_app` ganhou `DELETE` só em `users`, `schedules`, `kiosks` e `kiosk_tickets` (reaplicado pelo `dbinit` a cada subida).
+
 ## Piloto e implantação
 
 Roteiro em fases (preparação, ensaio, piloto de um mês, expansão), com lista de testes práticos, ficha do tablet da Central, métricas, contingência e pendências legais: [docs/piloto-e-implantacao.md](docs/piloto-e-implantacao.md).

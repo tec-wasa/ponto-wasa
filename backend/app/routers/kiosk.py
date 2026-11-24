@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from ..config import settings
 from ..db import get_db
 from ..deps import MANAGEMENT_ROLES, client_ip, get_current_user, require_roles
-from ..models import AuditLog, Company, Kiosk, Punch, User
+from ..models import AuditLog, Company, Kiosk, KioskTicket, Punch, User
 from ..security import verify_password
 from ..services import audit, badges, clock, photos
 from ..services import kiosk as svc
@@ -381,6 +381,20 @@ def patch_kiosk(kiosk_id: int, body: KioskPatch, request: Request, actor: User =
     audit.log(db, actor, "update", "kiosk", k.id, before=before, after=data, ip=client_ip(request))
     db.commit()
     return _out(k)
+
+
+@router.delete("/kiosks/{kiosk_id}", status_code=204)
+def delete_kiosk(kiosk_id: int, request: Request, actor: User = Depends(require_roles("admin")), db: Session = Depends(get_db)):
+    """Remove da lista uma central JÁ REVOGADA. As batidas feitas nela continuam (aparecem como "Central <número>")."""
+    k = _own(db, actor, kiosk_id)
+    if k.active:
+        raise HTTPException(409, "Revogue a central antes de excluí-la")
+    n = db.execute(select(func.count()).select_from(Punch).where(Punch.kiosk_id == k.id)).scalar_one()
+    db.query(KioskTicket).filter(KioskTicket.kiosk_id == k.id).delete()
+    audit.log(db, actor, "delete", "kiosk", k.id, before={"name": k.name}, after={"punches_kept": n}, ip=client_ip(request))
+    db.delete(k)
+    db.commit()
+    return Response(status_code=204)
 
 
 @router.post("/kiosks/{kiosk_id}/pairing")

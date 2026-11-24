@@ -32,6 +32,7 @@ export default function Kiosks({ readOnly, notify }: { readOnly: boolean; notify
   const [confirm, setConfirm] = useState<string | null>(null);
   const [form, setForm] = useState({ name: "", latitude: "", longitude: "", radius: "100" });
   const [geoBusy, setGeoBusy] = useState(false);
+  const [edit, setEdit] = useState<{ id: number; name: string; latitude: string; longitude: string; radius: string } | null>(null);
 
   const load = useCallback(() => api<Kiosk[]>("/kiosks").then(setList).catch(notify.fail), []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { void load(); const t = setInterval(() => void load(), 30_000); return () => clearInterval(t); }, [load]);
@@ -70,6 +71,34 @@ export default function Kiosks({ readOnly, notify }: { readOnly: boolean; notify
       setConfirm(null);
       await load();
     } catch (err) {
+      notify.fail(err);
+    }
+  }
+
+  async function saveEdit(e: FormEvent) {
+    e.preventDefault();
+    if (!edit) return;
+    try {
+      await api(`/kiosks/${edit.id}`, {
+        method: "PATCH",
+        body: { name: edit.name, radius_m: Number(edit.radius), latitude: edit.latitude ? Number(edit.latitude) : null, longitude: edit.longitude ? Number(edit.longitude) : null },
+      });
+      notify.ok("Central atualizada.");
+      setEdit(null);
+      await load();
+    } catch (err) {
+      notify.fail(err);
+    }
+  }
+
+  async function remove(k: Kiosk) {
+    try {
+      await api(`/kiosks/${k.id}`, { method: "DELETE" });
+      notify.ok(`${k.name} excluída. As batidas feitas nela continuam nos registros.`);
+      setConfirm(null);
+      await load();
+    } catch (err) {
+      setConfirm(null);
       notify.fail(err);
     }
   }
@@ -146,6 +175,29 @@ export default function Kiosks({ readOnly, notify }: { readOnly: boolean; notify
             </p>
             {k.active && k.paired && k.last_seen_at && Date.now() - new Date(`${k.last_seen_at}Z`).getTime() > 3_600_000 && (
               <p className="warn small" style={{ margin: "0 0 6px" }}>⚠ Esta central não dá sinal há mais de 1 hora.</p>
+            )}
+            {isAdmin && (
+              <div className="row" style={{ marginBottom: 8 }}>
+                <button onClick={() => setEdit({ id: k.id, name: k.name, latitude: k.latitude?.toString() ?? "", longitude: k.longitude?.toString() ?? "", radius: String(k.radius_m) })}>Editar</button>
+                {!k.active && <button className="danger" onClick={() => setConfirm(`del-${k.id}`)}>Excluir</button>}
+              </div>
+            )}
+            {confirm === `del-${k.id}` && (
+              <div className="alert info" role="alertdialog" style={{ marginBottom: 8 }}>
+                <p style={{ margin: "0 0 8px" }}>Excluir {k.name} da lista? As batidas feitas nela continuam nos registros (aparecem como “Central {k.id}”). Não dá para desfazer.</p>
+                <div className="row"><button className="danger" onClick={() => remove(k)}>Confirmar exclusão</button><button onClick={() => setConfirm(null)}>Voltar</button></div>
+              </div>
+            )}
+            {edit?.id === k.id && (
+              <form className="card" onSubmit={saveEdit} aria-label={`Editar ${k.name}`}>
+                <label>Nome<input required minLength={2} maxLength={100} value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} /></label>
+                <div className="grid2 keep">
+                  <label>Latitude<input inputMode="decimal" value={edit.latitude} onChange={(e) => setEdit({ ...edit, latitude: e.target.value })} /></label>
+                  <label>Longitude<input inputMode="decimal" value={edit.longitude} onChange={(e) => setEdit({ ...edit, longitude: e.target.value })} /></label>
+                </div>
+                <label>Raio de tolerância (metros)<input type="number" min={10} max={5000} value={edit.radius} onChange={(e) => setEdit({ ...edit, radius: e.target.value })} /></label>
+                <div className="row"><button className="primary">Salvar</button><button type="button" onClick={() => setEdit(null)}>Cancelar</button></div>
+              </form>
             )}
             {isAdmin && k.active && (
               <>
