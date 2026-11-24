@@ -12,14 +12,13 @@ import argparse
 import os
 import sys
 import unicodedata
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import create_engine, delete, select, text, update
 from sqlalchemy.orm import Session
 
 from . import immutability
-from .models import (Absence, Adjustment, ArpEvent, AuditLog, Closing, HourBankEntry, Kiosk, KioskTicket, NsrCounter, Punch, PunchPhoto,
-                     User)
+from .models import Absence, Adjustment, ArpEvent, AuditLog, Closing, HourBankEntry, Kiosk, KioskTicket, NsrCounter, Punch, PunchPhoto, User
 from .services.arp import GENESIS, punch_hash
 
 
@@ -74,7 +73,6 @@ def main() -> None:
         if not drop:
             sys.exit("Nada a apagar.")
 
-        keep_ids = [u.id for u in keep]
         drop_ids = [u.id for u in drop]
         owner = next((u for u in keep if u.role == "admin"), admins[0] if admins else keep[0])
         photo_rows = db.execute(select(PunchPhoto.storage_key).where(PunchPhoto.user_id.in_(drop_ids))).scalars().all()
@@ -119,7 +117,7 @@ def main() -> None:
                     company_id=company_id, actor_id=None, action="cleanup", entity="users", entity_id=None,
                     before={"removidos": [{"id": u.id, "name": u.name} for u in drop]},
                     after={"mantidos": [u.name for u in keep], "nsr_renumerado": len(seq)}, ip="manutencao",
-                    at=datetime.now(timezone.utc).replace(tzinfo=None)))
+                    at=datetime.now(UTC).replace(tzinfo=None)))
         finally:
             _set_triggers(conn, True)
 
