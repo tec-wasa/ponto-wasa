@@ -6,6 +6,8 @@ export interface User {
   email: string;
   cpf: string;
   role: Role;
+  roles?: Role[]; // funções de gestão acumuláveis (admin, hr, manager; auditor sozinho)
+  tracks_time?: boolean; // false: cadastro só de gestão, não registra ponto
   manager_id: number | null;
   schedule_id: number | null;
   active: boolean;

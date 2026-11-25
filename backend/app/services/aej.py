@@ -49,7 +49,7 @@ def build_aej(db: Session, company: Company, start: date, end: date, now: dateti
     lo, hi = utc_bounds(company, start, end)
 
     # Colaboradores com movimento no período (ou ativos) e suas marcações.
-    users = db.execute(select(User).where(User.company_id == company.id).order_by(User.id)).scalars().all()
+    users = db.execute(select(User).where(User.company_id == company.id, User.tracks_time.is_(True)).order_by(User.id)).scalars().all()
     people = []
     for u in users:
         punches, inclusions, voided = user_marks(db, u, lo, hi)

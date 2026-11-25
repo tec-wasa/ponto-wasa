@@ -101,7 +101,8 @@ def hour_bank_statement(
 def hour_bank_team(actor: User = Depends(require_roles(*APPROVERS, "auditor")), db: Session = Depends(get_db)):
     """Saldos de quem usa banco de horas (equipe do gestor; empresa toda para RH, admin e auditor)."""
     company = db.get(Company, actor.company_id)
-    q = select(User).where(User.company_id == actor.company_id, User.active.is_(True), User.hour_bank_enabled.is_(True))
+    q = select(User).where(User.company_id == actor.company_id, User.active.is_(True), User.hour_bank_enabled.is_(True),
+                                   User.tracks_time.is_(True))
     if actor.role == "manager":
         q = q.where(User.manager_id == actor.id)
     rows = []

@@ -10,7 +10,20 @@ from sqlalchemy.orm import Session
 
 from ..db import get_db
 from ..deps import MANAGEMENT_ROLES, client_ip, get_current_user, require_roles
-from ..models import Absence, Adjustment, Closing, Company, HourBankEntry, KioskTicket, Punch, PunchPhoto, Schedule, User
+from ..models import (
+    MANAGEMENT_FUNCS,
+    Absence,
+    Adjustment,
+    Closing,
+    Company,
+    HourBankEntry,
+    KioskTicket,
+    Punch,
+    PunchPhoto,
+    Schedule,
+    User,
+    top_role,
+)
 from ..schemas import (
     ROLES,
     CompanyOut,
@@ -31,11 +44,20 @@ router = APIRouter(tags=["cadastros"])
 PRIVILEGED = ("hr", "admin")
 
 
-def _check_role_change(actor: User, role: str) -> None:
-    if role not in ROLES:
+def _resolve_roles(actor: User, roles: list[str] | None, role: str | None) -> list[str]:
+    """Funções de gestão acumuláveis (admin, hr, manager; auditor sozinho). Lista vazia = colaborador comum."""
+    if roles is None:
+        if role not in ROLES:
+            raise HTTPException(422, "Perfil inválido")
+        roles = [] if role == "employee" else [role]
+    roles = list(dict.fromkeys(roles))
+    if any(r not in MANAGEMENT_FUNCS for r in roles):
         raise HTTPException(422, "Perfil inválido")
-    if role in PRIVILEGED + ("auditor",) and actor.role != "admin":
+    if "auditor" in roles and len(roles) > 1:
+        raise HTTPException(422, "O auditor (acesso só de leitura para a fiscalização) não acumula com outras funções")
+    if roles and actor.role != "admin":
         raise HTTPException(403, "Somente o administrador atribui este perfil")
+    return sorted(roles, key=lambda r: (MANAGEMENT_FUNCS.index(r)))
 
 
 def _same_company(db: Session, actor: User, model, obj_id: int | None, label: str):
@@ -78,15 +100,15 @@ def create_user(
     body: UserIn, request: Request, actor: User = Depends(require_roles(*MANAGEMENT_ROLES)),
     db: Session = Depends(get_db),
 ):
-    _check_role_change(actor, body.role)
+    roles = _resolve_roles(actor, body.roles, body.role)
     _same_company(db, actor, User, body.manager_id, "Gestor")
     _same_company(db, actor, Schedule, body.schedule_id, "Jornada")
     if db.execute(select(User.id).where(User.company_id == actor.company_id, User.cpf == body.cpf)).first():
         raise HTTPException(409, "CPF já cadastrado nesta empresa")
     user = User(
         company_id=actor.company_id, name=body.name, email=body.email.lower(), cpf=body.cpf,
-        password_hash=hash_password(body.password), role=body.role,
-        manager_id=body.manager_id, schedule_id=body.schedule_id, admitted_at=body.admitted_at,
+        password_hash=hash_password(body.password), role=top_role(roles), roles=",".join(roles),
+        tracks_time=body.tracks_time, manager_id=body.manager_id, schedule_id=body.schedule_id, admitted_at=body.admitted_at,
         job_title=body.job_title, must_change_password=body.must_change_password,
     )
     db.add(user)
@@ -97,7 +119,7 @@ def create_user(
         db.rollback()
         raise HTTPException(409, "E-mail já cadastrado") from None
     arp.record_employee(db, db.get(Company, actor.company_id), "I", user, actor)  # tipo 5: inclusão
-    audit.log(db, actor, "create", "user", user.id, after={"email": user.email, "role": user.role},
+    audit.log(db, actor, "create", "user", user.id, after={"email": user.email, "roles": user.roles, "tracks_time": user.tracks_time},
               ip=client_ip(request))
     db.commit()
     return user
@@ -118,10 +140,18 @@ def patch_user(
 ):
     user = _same_company(db, actor, User, user_id, "Usuário")
     data = body.model_dump(exclude_unset=True)
-    if "role" in data:
-        _check_role_change(actor, data["role"])
     if user.role in PRIVILEGED and actor.role != "admin":
         raise HTTPException(403, "Somente o administrador altera este usuário")
+    if "roles" in data or "role" in data:
+        new_roles, legacy = data.pop("roles", None), data.pop("role", None)
+        roles = _resolve_roles(actor, new_roles, legacy if new_roles is None else None)
+        if user.id == actor.id and "admin" not in roles:
+            raise HTTPException(409, "Você não pode tirar de si mesmo a função de administrador")
+        data["roles"], data["role"] = ",".join(roles), top_role(roles)
+    if data.get("hour_bank_enabled") and not data.get("tracks_time", user.tracks_time):
+        raise HTTPException(422, "Esta pessoa não registra ponto, então não tem banco de horas")
+    if data.get("tracks_time") is False and user.hour_bank_enabled:
+        data["hour_bank_enabled"] = False
     if "manager_id" in data:
         _same_company(db, actor, User, data["manager_id"], "Gestor")
         if data["manager_id"] == user.id:

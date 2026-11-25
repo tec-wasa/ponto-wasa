@@ -34,6 +34,7 @@ export default function Bank() {
   }, [isApprover]);
 
   const load = useCallback(async () => {
+    if (user?.tracks_time === false && !target) { setSummary(null); setStatement(null); return; }  // só gere: escolha uma pessoa
     const who = target ? `&user_id=${target}` : "";
     try {
       const [s, st] = await Promise.all([
@@ -45,7 +46,7 @@ export default function Bank() {
     } catch (e) {
       setMsg({ type: "error", text: e instanceof Error ? e.message : "Erro ao carregar" });
     }
-  }, [target, start, end]);
+  }, [target, start, end, user?.tracks_time]);
 
   useEffect(() => {
     load();
@@ -61,8 +62,8 @@ export default function Bank() {
         <label>
           Colaborador
           <select value={target} onChange={(e) => setTarget(e.target.value ? Number(e.target.value) : "")}>
-            <option value="">Eu ({user?.name})</option>
-            {people.filter((p) => p.id !== user?.id).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            {user?.tracks_time !== false ? <option value="">Eu ({user?.name})</option> : <option value="">Escolha…</option>}
+            {people.filter((p) => p.id !== user?.id && p.tracks_time !== false).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </label>
       )}

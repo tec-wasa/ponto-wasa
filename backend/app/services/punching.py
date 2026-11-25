@@ -122,6 +122,8 @@ def register_punch(
     keep_location: bool = False,
 ) -> Punch:
     company = db.get(Company, user.company_id)
+    if not user.tracks_time:
+        raise PunchError(403, "Este cadastro é só de gestão: não registra ponto")
     if not user.cpf:
         raise PunchError(422, "CPF do trabalhador não cadastrado")
     if collector not in COLLECTORS:

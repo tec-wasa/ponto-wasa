@@ -26,6 +26,36 @@ function useNotice() {
   return { ok, fail, el };
 }
 
+const ROLE_HELP: Record<string, string> = {
+  admin: "tudo: cadastros, jornadas, Centrais, fechamento, configurações",
+  hr: "ajustes, ausências, banco de horas, relatórios, exportações fiscais",
+  manager: "aprova ajustes e ausências e vê a equipe",
+  auditor: "só leitura (fiscalização); não acumula com as outras",
+};
+
+/** Funções acumuláveis (Administrador + RH + Gestor na mesma pessoa) e se a pessoa registra ponto. */
+function RolePicker({ roles, tracks, onRoles, onTracks }: { roles: string[]; tracks: boolean; onRoles: (r: string[]) => void; onTracks: (t: boolean) => void }) {
+  const toggle = (r: string) => {
+    if (roles.includes(r)) return onRoles(roles.filter((x) => x !== r));
+    onRoles(r === "auditor" ? ["auditor"] : [...roles.filter((x) => x !== "auditor"), r]);
+  };
+  return (
+    <fieldset style={{ gridColumn: "1 / -1", border: "1px solid var(--line, #ddd)", borderRadius: 8, padding: "8px 12px", margin: "8px 0" }}>
+      <legend>Funções (marque quantas quiser)</legend>
+      {["admin", "hr", "manager", "auditor"].map((r) => (
+        <label key={r} style={{ display: "flex", gap: 8, alignItems: "flex-start", margin: "4px 0" }}>
+          <input type="checkbox" checked={roles.includes(r)} onChange={() => toggle(r)} style={{ width: "auto", marginTop: 4 }} />
+          <span><b>{ROLE_LABEL[r]}</b> <span className="muted small">— {ROLE_HELP[r]}</span></span>
+        </label>
+      ))}
+      <label style={{ display: "flex", gap: 8, alignItems: "flex-start", margin: "8px 0 4px" }}>
+        <input type="checkbox" checked={tracks} onChange={(e) => onTracks(e.target.checked)} style={{ width: "auto", marginTop: 4 }} />
+        <span><b>Registra ponto</b> <span className="muted small">— desmarque para quem só faz a gestão: sem Espelho, banco de horas nem marcação.</span></span>
+      </label>
+    </fieldset>
+  );
+}
+
 export default function Admin() {
   const { user } = useAuth();
   const [tab, setTab] = useState<Tab>("usuarios");
@@ -55,11 +85,11 @@ function Users({ readOnly }: { readOnly: boolean }) {
   const { user } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
-  const [f, setF] = useState({ name: "", email: "", password: "", cpf: "", role: "employee", manager_id: "", schedule_id: "", admitted_at: "", job_title: "" });
+  const [f, setF] = useState({ name: "", email: "", password: "", cpf: "", roles: [] as string[], tracks_time: true, manager_id: "", schedule_id: "", admitted_at: "", job_title: "" });
   const [query, setQuery] = useState("");
   const [showInactive, setShowInactive] = useState(false);
   const [confirm, setConfirm] = useState<string | null>(null); // "<ação>-<id>": confirmação na própria tela
-  const [edit, setEdit] = useState<{ id: number; name: string; email: string; cpf: string; job_title: string } | null>(null);
+  const [edit, setEdit] = useState<{ id: number; name: string; email: string; cpf: string; job_title: string; roles: string[]; tracks_time: boolean } | null>(null);
   const [newSchedule, setNewSchedule] = useState<{ id: number; value: string } | null>(null); // troca de jornada em confirmação
   const [scheduleError, setScheduleError] = useState("");
   const [temp, setTemp] = useState<{ name: string; password: string } | null>(null);
@@ -83,14 +113,14 @@ function Users({ readOnly }: { readOnly: boolean }) {
       await api("/users", {
         method: "POST",
         body: {
-          name: f.name, email: f.email, password: f.password, cpf: f.cpf, role: f.role,
+          name: f.name, email: f.email, password: f.password, cpf: f.cpf, roles: f.roles, tracks_time: f.tracks_time,
           manager_id: f.manager_id ? Number(f.manager_id) : null,
           schedule_id: f.schedule_id ? Number(f.schedule_id) : null,
           admitted_at: f.admitted_at || null,
           job_title: f.job_title || null,
         },
       });
-      setF({ ...f, name: "", email: "", password: "", cpf: "" });
+      setF({ ...f, name: "", email: "", password: "", cpf: "", roles: [], tracks_time: true });
       n.ok("Colaborador cadastrado.");
       await load();
     } catch (err) {
@@ -113,7 +143,10 @@ function Users({ readOnly }: { readOnly: boolean }) {
     e.preventDefault();
     if (!edit) return;
     const u = users.find((x) => x.id === edit.id)!;
-    const body: Record<string, string> = {};
+    const body: Record<string, unknown> = {};
+    const before = (u.roles ?? []).slice().sort().join(",");
+    if (isAdmin && edit.roles.slice().sort().join(",") !== before) body.roles = edit.roles;
+    if (isAdmin && edit.tracks_time !== (u.tracks_time !== false)) body.tracks_time = edit.tracks_time;
     if (edit.name.trim() !== u.name) body.name = edit.name.trim();
     if (edit.email.trim().toLowerCase() !== u.email) body.email = edit.email.trim();
     if (edit.cpf.replace(/\D/g, "") !== u.cpf) body.cpf = edit.cpf;
@@ -196,8 +229,8 @@ function Users({ readOnly }: { readOnly: boolean }) {
     }
   }
 
-  // Só dois perfis de uso: colaborador e administrador (master: gestão, RH, aprovações, centrais). Auditor = leitura para a fiscalização.
-  const roles = user?.role === "admin" ? ["employee", "admin", "auditor"] : ["employee"];
+  // Funções acumuláveis na mesma pessoa; quem não marca "Registra ponto" só gere (sem espelho, banco de horas nem marcação).
+  const isAdmin = user?.role === "admin";
   const managers = users.filter((u) => u.active && ["admin", "hr", "manager"].includes(u.role));
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -254,7 +287,8 @@ function Users({ readOnly }: { readOnly: boolean }) {
                 <span className="muted small">{u.job_title ? `${u.job_title} · ` : ""}{u.email}</span>
               </span>
               <span className="day-num" style={{ alignItems: "flex-end", gap: 4 }}>
-                {u.role !== "employee" && <span className="tag">{ROLE_LABEL[u.role]}</span>}
+                {(u.roles?.length ? u.roles : u.role !== "employee" ? [u.role] : []).map((r) => <span className="tag" key={r}>{ROLE_LABEL[r]}</span>)}
+                {u.tracks_time === false && <span className="tag">Não bate ponto</span>}
                 {!u.active && <span className="tag falta">Inativo</span>}
               </span>
             </summary>
@@ -307,14 +341,14 @@ function Users({ readOnly }: { readOnly: boolean }) {
               {!readOnly && (
                 <>
                   <div className="row">
-                    <button onClick={() => patch(u, { hour_bank_enabled: !u.hour_bank_enabled },
+                    {u.tracks_time !== false && <button onClick={() => patch(u, { hour_bank_enabled: !u.hour_bank_enabled },
                       u.hour_bank_enabled ? "Banco de horas desativado (o histórico é mantido)." : "Banco de horas ativado; o saldo conta a partir de hoje.")}>
                       {u.hour_bank_enabled ? "Desativar banco de horas" : "Ativar banco de horas"}
-                    </button>
+                    </button>}
                     <button onClick={() => download(`/users/${u.id}/badge.pdf`, `cracha-${u.id}.pdf`).catch((e) => n.fail(e))}>Baixar crachá (PDF)</button>
                     {badges[u.id]?.has_pin && <button onClick={() => setConfirm(`pin-${u.id}`)}>Zerar PIN</button>}
                     <button onClick={() => setConfirm(`badge-${u.id}`)}>Regenerar crachá</button>
-                    <button onClick={() => setEdit({ id: u.id, name: u.name, email: u.email, cpf: fmtCpf(u.cpf), job_title: u.job_title ?? "" })}>Editar dados</button>
+                    <button onClick={() => setEdit({ id: u.id, name: u.name, email: u.email, cpf: fmtCpf(u.cpf), job_title: u.job_title ?? "", roles: u.roles ?? (u.role !== "employee" ? [u.role] : []), tracks_time: u.tracks_time !== false })}>Editar dados</button>
                     {u.id !== user?.id && <button onClick={() => setConfirm(`pw-${u.id}`)}>Nova senha</button>}
                     {u.id !== user?.id && u.totp_enabled && <button onClick={() => setConfirm(`2fa-${u.id}`)}>Zerar 2FA</button>}
                     {u.id !== user?.id && (
@@ -329,6 +363,7 @@ function Users({ readOnly }: { readOnly: boolean }) {
                       <label>CPF<input required inputMode="numeric" value={edit.cpf} onChange={(e) => setEdit({ ...edit, cpf: e.target.value })} /></label>
                       <p className="muted small" style={{ margin: "0 0 8px" }}>O CPF só pode ser corrigido enquanto a pessoa não tem marcações (ele faz parte de cada registro). Nome e CPF alterados ficam registrados no REP-P (tipo 5).</p>
                       <label>Cargo ou função<input maxLength={100} value={edit.job_title} onChange={(e) => setEdit({ ...edit, job_title: e.target.value })} /></label>
+                      {isAdmin && <RolePicker roles={edit.roles} tracks={edit.tracks_time} onRoles={(r) => setEdit({ ...edit, roles: r })} onTracks={(t) => setEdit({ ...edit, tracks_time: t })} />}
                       <div className="row"><button className="primary">Salvar</button><button type="button" onClick={() => setEdit(null)}>Cancelar</button></div>
                     </form>
                   )}
@@ -357,11 +392,7 @@ function Users({ readOnly }: { readOnly: boolean }) {
               <label>Cargo ou função<input maxLength={100} value={f.job_title} onChange={(e) => setF({ ...f, job_title: e.target.value })} /></label>
               <label>Data de admissão<input type="date" value={f.admitted_at} onChange={(e) => setF({ ...f, admitted_at: e.target.value })} /></label>
               <label>Senha inicial<input type="password" required minLength={8} autoComplete="new-password" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} /></label>
-              <label>Perfil
-                <select value={f.role} onChange={(e) => setF({ ...f, role: e.target.value })}>
-                  {roles.map((r) => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}
-                </select>
-              </label>
+              {isAdmin && <RolePicker roles={f.roles} tracks={f.tracks_time} onRoles={(r) => setF({ ...f, roles: r })} onTracks={(t) => setF({ ...f, tracks_time: t })} />}
               <label>Gestor
                 <select value={f.manager_id} onChange={(e) => setF({ ...f, manager_id: e.target.value })}>
                   <option value="">—</option>

@@ -112,17 +112,19 @@ export default function App() {
   const canAdmin = ["hr", "admin", "auditor"].includes(user.role);
   const approver = ["manager", "hr", "admin"].includes(user.role);
   const reports = approver || canAdmin;
+  const tracks = user.tracks_time !== false; // cadastro só de gestão não bate ponto: sem a tela "Ponto"
 
   // Menu do desktop: tudo. Barra inferior do celular: 4 abas (design.md); o resto fica em "Mais".
   const desktop = [
-    { to: "/", label: "Ponto", end: true }, { to: "/espelho", label: "Espelho" }, { to: "/ajustes", label: "Ajustes" },
+    ...(tracks ? [{ to: "/", label: "Ponto", end: true }] : []), { to: "/espelho", label: "Espelho" }, { to: "/ajustes", label: "Ajustes" },
     { to: "/ausencias", label: "Ausências" }, { to: "/banco", label: "Banco de horas" },
     ...(approver ? [{ to: "/equipe", label: "Equipe" }] : []),
     ...(reports ? [{ to: "/relatorios", label: "Relatórios" }] : []),
     ...(canAdmin ? [{ to: "/admin", label: "Gestão" }] : []),
   ];
-  const third = approver ? { to: "/equipe", label: "Equipe", icon: <IconPeople /> } : { to: "/banco", label: "Banco", icon: <IconClock /> };
-  const tabPaths = ["/", "/espelho", third.to];
+  const first = tracks ? { to: "/", label: "Ponto", icon: <IconHome /> } : { to: "/equipe", label: "Equipe", icon: <IconPeople /> };
+  const third = approver && tracks ? { to: "/equipe", label: "Equipe", icon: <IconPeople /> } : { to: "/banco", label: "Banco", icon: <IconClock /> };
+  const tabPaths = [first.to, "/espelho", third.to];
   const moreActive = !tabPaths.includes(location.pathname);
 
   return (
@@ -139,7 +141,7 @@ export default function App() {
       )}
       <main>
         <Routes>
-          <Route path="/" element={<Punch online={online} />} />
+          <Route path="/" element={tracks ? <Punch online={online} /> : <Navigate to={approver ? "/equipe" : "/admin"} replace />} />
           <Route path="/espelho" element={<Mirror />} />
           <Route path="/ajustes" element={<Adjustments />} />
           <Route path="/ausencias" element={<Absences />} />
@@ -154,7 +156,7 @@ export default function App() {
         </Routes>
       </main>
       <nav className="tabbar" aria-label="Navegação principal">
-        <NavLink to="/" end><IconHome />Ponto</NavLink>
+        <NavLink to={first.to} end>{first.icon}{first.label}</NavLink>
         <NavLink to="/espelho"><IconList />Registros</NavLink>
         <NavLink to={third.to}>{third.icon}{third.label}</NavLink>
         <NavLink to="/mais" className={moreActive ? "active" : ""}><IconMore />Mais</NavLink>

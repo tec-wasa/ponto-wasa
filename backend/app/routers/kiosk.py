@@ -457,7 +457,7 @@ def user_badge_pdf(user_id: int, request: Request, actor: User = Depends(require
 def all_badges_pdf(request: Request, ids: list[int] | None = Query(None), actor: User = Depends(require_roles(*MANAGEMENT_ROLES)),
                    db: Session = Depends(get_db)):
     """Crachás de várias pessoas de uma vez (todas as ativas, ou as de `ids`). RH não imprime os de RH, admin e auditor."""
-    q = select(User).where(User.company_id == actor.company_id, User.active.is_(True)).order_by(User.name)
+    q = select(User).where(User.company_id == actor.company_id, User.active.is_(True), User.tracks_time.is_(True)).order_by(User.name)
     if ids:
         q = q.where(User.id.in_(ids))
     if actor.role != "admin":

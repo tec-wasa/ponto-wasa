@@ -118,7 +118,7 @@ def person_state(db: Session, company: Company, user: User, at: datetime, voided
 
 def scope_users(db: Session, actor: User) -> list[User]:
     q = select(User).where(User.company_id == actor.company_id, User.active.is_(True), User.id != actor.id,
-                           User.role != "auditor")
+                           User.role != "auditor", User.tracks_time.is_(True))
     if actor.role == "manager":
         q = q.where(User.manager_id == actor.id)
     return list(db.execute(q.order_by(User.name)).scalars())

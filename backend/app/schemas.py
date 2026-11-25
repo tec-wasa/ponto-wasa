@@ -33,7 +33,9 @@ class UserIn(BaseModel):
     email: EmailStr
     cpf: str  # obrigatório: identifica o trabalhador nos registros do REP-P
     password: str = Field(min_length=8)
-    role: str = "employee"
+    role: str = "employee"  # legado: um só perfil; prefira `roles`
+    roles: list[str] | None = None  # funções de gestão acumuláveis: admin, hr, manager (ou só auditor)
+    tracks_time: bool = True  # False: só gere, não bate ponto (sem espelho, banco de horas, ajustes)
     manager_id: int | None = None
     schedule_id: int | None = None
     admitted_at: date | None = None
@@ -57,6 +59,8 @@ class UserPatch(BaseModel):
     hour_bank_enabled: bool | None = None
     hour_bank_start: date | None = None
     role: str | None = None
+    roles: list[str] | None = None
+    tracks_time: bool | None = None
     manager_id: int | None = None
     schedule_id: int | None = None
     active: bool | None = None
@@ -78,6 +82,8 @@ class UserOut(ORM):
     email: str
     cpf: str
     role: str
+    roles: list[str] = []
+    tracks_time: bool = True
     manager_id: int | None
     schedule_id: int | None
     active: bool
@@ -90,6 +96,11 @@ class UserOut(ORM):
     hour_bank_start: date | None
     must_change_password: bool
     totp_enabled: bool
+
+    @field_validator("roles", mode="before")
+    @classmethod
+    def _roles(cls, v):
+        return [r for r in v.split(",") if r] if isinstance(v, str) else (v or [])
 
 
 class CompanyOut(ORM):

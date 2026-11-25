@@ -54,6 +54,7 @@ export default function Mirror() {
   }, [canPickPerson]);
 
   useEffect(() => {
+    if (user?.tracks_time === false && !target) { setData(null); return; }  // só gere: precisa escolher uma pessoa
     let cancelled = false;
     setLoading(true);
     setError("");
@@ -132,8 +133,9 @@ export default function Mirror() {
         <label>
           Colaborador
           <select value={target} onChange={(e) => setTarget(e.target.value ? Number(e.target.value) : "")}>
-            <option value="">Eu ({user?.name})</option>
-            {people.filter((p) => p.id !== user?.id).map((p) => (
+            {user?.tracks_time !== false && <option value="">Eu ({user?.name})</option>}
+            {user?.tracks_time === false && <option value="">Escolha…</option>}
+            {people.filter((p) => p.id !== user?.id && p.tracks_time !== false).map((p) => (
               <option key={p.id} value={p.id}>{p.name}</option>
             ))}
           </select>

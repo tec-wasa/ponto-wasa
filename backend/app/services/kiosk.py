@@ -141,7 +141,7 @@ def resolve_user(db: Session, kiosk: Kiosk, method: str, value: str, now: dateti
                         user, rotating = cand, True
         except (ValueError, IndexError):
             user = None
-    if user is None or not user.active:
+    if user is None or not user.active or not user.tracks_time:
         raise fail
     return user, rotating
 

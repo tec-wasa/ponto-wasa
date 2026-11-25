@@ -21,6 +21,7 @@ from sqlalchemy import (
     UniqueConstraint,
     event,
     false,
+    true,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -82,7 +83,9 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(200), unique=True)
     cpf: Mapped[str] = mapped_column(String(11))  # só dígitos, validado; obrigatório (identifica o trabalhador no REP-P)
     password_hash: Mapped[str] = mapped_column(String(300))
-    role: Mapped[str] = mapped_column(String(20), default="employee")  # employee|manager|hr|admin|auditor
+    role: Mapped[str] = mapped_column(String(20), default="employee")  # perfil mais alto de `roles` (compatibilidade): employee|manager|hr|admin|auditor
+    roles: Mapped[str] = mapped_column(String(60), default="", server_default="")  # funções de gestão acumuláveis, ex.: "admin,hr,manager"
+    tracks_time: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())  # False = só gere, não bate ponto
     manager_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), default=None)
     schedule_id: Mapped[int | None] = mapped_column(ForeignKey("schedules.id"), default=None)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -98,6 +101,10 @@ class User(Base):
     badge_version: Mapped[int] = mapped_column(Integer, default=1)  # regenerar invalida os crachás impressos
     badge_secret: Mapped[str | None] = mapped_column(Text, default=None)  # segredo do QR rotativo (cifrado)
     badge_last_step: Mapped[int | None] = mapped_column(Integer, default=None)  # anti-repetição do QR rotativo
+
+    @property
+    def role_list(self) -> list[str]:
+        return [r for r in (self.roles or "").split(",") if r]
 
     @property
     def has_pin(self) -> bool:
@@ -286,6 +293,29 @@ class AuditLog(Base):
     after: Mapped[dict | None] = mapped_column(JSON, default=None)
     ip: Mapped[str | None] = mapped_column(String(64), default=None)
     at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+# --- Perfis acumuláveis -----------------------------------------------------
+ROLE_ORDER = ("admin", "hr", "manager")  # do mais para o menos poderoso; cada um inclui o poder dos seguintes
+MANAGEMENT_FUNCS = ROLE_ORDER + ("auditor",)
+
+
+def top_role(roles: list[str]) -> str:
+    for r in ROLE_ORDER:
+        if r in roles:
+            return r
+    return "auditor" if "auditor" in roles else "employee"
+
+
+@event.listens_for(User, "before_insert")
+@event.listens_for(User, "before_update")
+def _sync_roles(mapper, connection, target):
+    """`roles` é a fonte; `role` guarda o perfil mais alto (o resto do sistema decide permissões por ele)."""
+    listed = target.role_list
+    if listed:
+        target.role = top_role(listed)
+    elif target.role and target.role != "employee":
+        target.roles = target.role  # cadastro criado só com `role`
 
 
 # --- Imutabilidade: guarda no ORM + gatilhos no banco -----------------------
