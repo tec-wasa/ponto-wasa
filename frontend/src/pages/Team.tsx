@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { api } from "../api";
 import { useAuth } from "../auth";
 import type { Dashboard } from "../types";
+import MonthPanel from "./MonthPanel";
 import { fmtMinutes, localToUtcIso } from "../util";
 
 const ORDER = ["sem_marcacao", "incompleto", "presente", "em_intervalo", "aguardando", "saiu", "justificada", "folga"] as const;
@@ -56,6 +57,8 @@ export default function Team() {
   return (
     <>
       <h1 style={{ margin: 0 }}>Painel</h1>
+      <MonthPanel />
+      <h2 className="section-sub">Agora</h2>
       <p className="muted small" aria-live="polite" style={{ margin: "4px 0 14px" }}>
         {at ? `Situação em ${d} às ${t}` : `Agora, ${t} · atualiza a cada minuto`}
       </p>

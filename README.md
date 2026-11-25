@@ -124,6 +124,10 @@ Autoaprovação: a Administração só decide o próprio pedido quando ninguém 
 
 Quem decide os pedidos de uma pessoa (gestor da equipe, RH, Administração) pode corrigir o mês dela por conta própria, sem esperar um pedido: incluir uma marcação esquecida, desconsiderar uma marcação errada e (RH/Administração) justificar o dia. A marcação original nunca é alterada: cada correção é um tratamento já aprovado, com motivo e autor, que entra no espelho e no AEJ, fica na auditoria (`treat`) e pode ser desfeito enquanto o mês estiver aberto (`revoke`). Mês fechado: reabra antes. A pessoa vê as correções em Solicitações e no espelho.
 
+## Painel: indicadores do mês
+
+O Painel (Gestão) abre com os indicadores do mês escolhido, calculados como o espelho e no escopo de quem vê (gestor: equipe; RH/Administração: empresa): horas trabalhadas e previstas, horas extras e débitos, faltas, dias com atraso (entrada além da tolerância de 5 min), dias a tratar (saída não registrada), aprovações pendentes e banco de horas. Abaixo, a situação de cada dia (completo, saída não registrada, falta) e o ranking por pessoa (saldo, faltas, atrasos), que leva ao Tratamento da pessoa. API: `GET /dashboard/month?month=AAAA-MM`. Em seguida, a situação de agora.
+
 ## Feriados e folhas de ponto
 
 Os feriados nacionais são calculados a cada ano (inclusive a Sexta-feira Santa, pela Páscoa); Carnaval e Corpus Christi entram se a empresa marcar; estaduais e municipais são cadastrados em Empresa > Configurações > Feriados (repetindo todo ano ou numa data só). Num feriado a jornada prevista é zero: sem falta, e o trabalhado conta como extra (100% na folha). Mudar feriado de um mês fechado é recusado. A folha de ponto mensal (uma página A4 retrato, para assinatura) sai por pessoa em Registros/Espelhos ou de todos de uma vez em Espelhos ("Folhas de ponto de todos", um PDF com uma página por pessoa, `GET /mirror/folhas.pdf`). O espelho detalhado, com NSR, continua em `modelo=detalhado`.

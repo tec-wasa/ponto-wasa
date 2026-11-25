@@ -261,3 +261,31 @@ export interface ImportResult {
   preview: { line: number; name: string; email: string; role: string; manager: string | null }[];
   credentials: { name: string; email: string; password: string }[];
 }
+
+export interface MonthPerson {
+  user_id: number;
+  name: string;
+  job_title: string | null;
+  worked: number;
+  expected: number;
+  balance: number;
+  extra: number;
+  absences: number;
+  incomplete: number;
+  justified: number;
+  late_days: number;
+  late_minutes: number;
+  bank_balance: number | null;
+  bank_alerts: number;
+}
+
+export interface MonthOverview {
+  month: string;
+  closed: boolean;
+  people_count: number;
+  totals: { worked: number; expected: number; balance: number; extra: number; debit: number; absences: number; incomplete: number; justified: number; late_days: number };
+  pending: { adjustments: number; absences: number };
+  bank: { people: number; balance: number; alerts: number };
+  days: { date: string; ok: number; incompleto: number; falta: number; justificada: number }[];
+  people: MonthPerson[];
+}

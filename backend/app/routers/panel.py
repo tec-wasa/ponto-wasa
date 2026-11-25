@@ -68,6 +68,21 @@ def dashboard(
     }
 
 
+@router.get("/dashboard/month")
+def dashboard_month(
+    month: str = Query(..., pattern=r"^\d{4}-(0[1-9]|1[0-2])$", description="YYYY-MM"),
+    actor: User = Depends(require("team.view")), db: Session = Depends(get_db),
+):
+    """Indicadores do mês da equipe (gestor) ou da empresa (RH/admin): horas, saldo, faltas, atrasos e pendências."""
+    company = db.get(Company, actor.company_id)
+    y, m = int(month[:4]), int(month[5:])
+    if (y, m) > hourbank.today_local(company).timetuple()[:2] or y < 2000:
+        raise HTTPException(422, "Escolha o mês atual ou um mês anterior")
+    if len(panel.scope_users(db, actor)) > 500:
+        raise HTTPException(413, "Escopo grande demais para o painel do mês")
+    return panel.month_overview(db, company, actor, y, m)
+
+
 # --- Banco de horas -------------------------------------------------------------
 def _target(db: Session, actor: User, user_id: int | None) -> User:
     target = db.get(User, user_id) if user_id else actor
