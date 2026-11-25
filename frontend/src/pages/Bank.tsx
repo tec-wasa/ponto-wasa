@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { api } from "../api";
 import { useAuth } from "../auth";
-import type { BankStatement, BankSummary, User } from "../types";
+import type { BankAlert, BankStatement, BankSummary } from "../types";
 import { fmtMinutes, todayLocal } from "../util";
 
 const sign = (m: number) => (m > 0 ? "+" : "") + fmtMinutes(m);
@@ -14,28 +14,72 @@ function daysAgo(iso: string, n: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-export default function Bank() {
-  const { user, company, reload } = useAuth();
+/** Meu ponto > Banco de horas: o saldo e o extrato da própria pessoa. */
+export default function MyBank() {
+  return (
+    <>
+      <h1>Banco de horas</h1>
+      <BankView />
+    </>
+  );
+}
+
+type TeamRow = { user_id: number; name: string; balance: number; limit_minutes: number | null; at_risk_minutes: number; alerts: BankAlert[] };
+
+/** Gestão > Banco de horas: saldos de quem usa banco de horas (equipe ou empresa), extrato de cada um e lançamentos do RH. */
+export function TeamBank() {
+  const { can } = useAuth();
+  const [rows, setRows] = useState<TeamRow[] | null>(null);
+  const [picked, setPicked] = useState<TeamRow | null>(null);
+  const [error, setError] = useState("");
+
+  const load = useCallback(() => api<TeamRow[]>("/hour-bank/team").then(setRows).catch((e) => setError(e instanceof Error ? e.message : "Erro")), []);
+  useEffect(() => { void load(); }, [load]);
+
+  return (
+    <>
+      <h1>Banco de horas</h1>
+      {error && <p className="alert error" role="alert">{error}</p>}
+      {rows && rows.length === 0 && (
+        <p className="card muted">Ninguém usa banco de horas. Ele é ativado no cadastro de cada pessoa, em Cadastros &gt; Pessoas.</p>
+      )}
+      {rows && rows.length > 0 && (
+        <section className="card" style={{ padding: "4px 16px" }} aria-label="Saldos">
+          <ul className="plain">
+            {rows.map((r) => (
+              <li key={r.user_id}>
+                <button className="row-btn" style={{ display: "flex", justifyContent: "space-between", width: "100%" }}
+                  aria-pressed={picked?.user_id === r.user_id} onClick={() => setPicked(picked?.user_id === r.user_id ? null : r)}>
+                  <span>{r.name}{r.alerts.length > 0 && <span className="warn small"> · ⚠ {r.alerts.map((a) => a.message).join("; ")}</span>}</span>
+                  <b className={cls(r.balance)}>{sign(r.balance)}</b>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      {picked && (
+        <>
+          <h2 className="section-title" style={{ marginTop: 20 }}>{picked.name}</h2>
+          <BankView userId={picked.user_id} entries={can("hourbank.entries")} onChange={load} />
+        </>
+      )}
+    </>
+  );
+}
+
+function BankView({ userId, entries, onChange }: { userId?: number; entries?: boolean; onChange?: () => void }) {
+  const { company } = useAuth();
   const tz = company!.timezone;
   const today = todayLocal(tz);
-  const isApprover = !!user && ["manager", "hr", "admin"].includes(user.role);
-  const isHr = !!user && ["hr", "admin"].includes(user.role);
-
-  const [people, setPeople] = useState<User[]>([]);
-  const [target, setTarget] = useState<number | "">("");
   const [start, setStart] = useState(daysAgo(today, 90));
   const [end, setEnd] = useState(today);
   const [summary, setSummary] = useState<BankSummary | null>(null);
   const [statement, setStatement] = useState<BankStatement | null>(null);
   const [msg, setMsg] = useState<{ type: "ok" | "error"; text: string } | null>(null);
 
-  useEffect(() => {
-    if (isApprover) api<User[]>("/users").then((u) => setPeople(u.filter((p) => p.hour_bank_enabled))).catch(() => undefined);
-  }, [isApprover]);
-
   const load = useCallback(async () => {
-    if (user?.tracks_time === false && !target) { setSummary(null); setStatement(null); return; }  // só gere: escolha uma pessoa
-    const who = target ? `&user_id=${target}` : "";
+    const who = userId ? `&user_id=${userId}` : "";
     try {
       const [s, st] = await Promise.all([
         api<BankSummary>(`/hour-bank?${who.slice(1)}`),
@@ -46,34 +90,15 @@ export default function Bank() {
     } catch (e) {
       setMsg({ type: "error", text: e instanceof Error ? e.message : "Erro ao carregar" });
     }
-  }, [target, start, end, user?.tracks_time]);
+  }, [userId, start, end]);
+  useEffect(() => { void load(); }, [load]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const viewedId = target || user?.id;
   return (
     <>
-      <h1>Banco de horas</h1>
       {msg && <p className={`alert ${msg.type}`} role={msg.type === "error" ? "alert" : "status"}>{msg.text}</p>}
-
-      {isApprover && (
-        <label>
-          Colaborador
-          <select value={target} onChange={(e) => setTarget(e.target.value ? Number(e.target.value) : "")}>
-            {user?.tracks_time !== false ? <option value="">Eu ({user?.name})</option> : <option value="">Escolha…</option>}
-            {people.filter((p) => p.id !== user?.id && p.tracks_time !== false).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
-        </label>
-      )}
-
       {summary && !summary.enabled && (
-        <p className="card muted">
-          {target ? "Este colaborador não usa banco de horas." : "Você não usa banco de horas. O RH pode ativá-lo no seu cadastro."}
-        </p>
+        <p className="card muted">{userId ? "Esta pessoa não usa banco de horas." : "Você não usa banco de horas: as horas a mais ou a menos aparecem só no seu espelho."}</p>
       )}
-
       {summary?.enabled && (
         <>
           <section className="card hero" aria-label="Saldo do banco de horas">
@@ -82,7 +107,7 @@ export default function Bank() {
             <p className="muted small" style={{ margin: 0 }}>Conta desde {summary.since ? br(summary.since) : "—"}</p>
             <div className="stat-row">
               <div><span className="section-title">Automático</span><b>{sign(summary.automatic ?? 0)}</b></div>
-              <div><span className="section-title">Créditos RH</span><b>{fmtMinutes(summary.credits ?? 0)}</b></div>
+              <div><span className="section-title">Créditos</span><b>{fmtMinutes(summary.credits ?? 0)}</b></div>
               <div><span className="section-title">Compensado</span><b>{fmtMinutes(summary.compensations ?? 0)}</b></div>
             </div>
           </section>
@@ -102,7 +127,7 @@ export default function Bank() {
                   <li key={i}>
                     <span>
                       <span className="muted small">{br(l.date)}</span><br />
-                      {l.description}{l.source === "lancamento" && <span className="tag" style={{ marginLeft: 6 }}>RH</span>}
+                      {l.description}{l.source === "lancamento" && <span className="tag" style={{ marginLeft: 6 }}>Lançamento</span>}
                     </span>
                     <span className="ledger-num">
                       <b className={cls(l.minutes)}>{sign(l.minutes)}</b>
@@ -124,20 +149,14 @@ export default function Bank() {
             </p>
           </details>
 
-          {isHr && viewedId !== user?.id && (
+          {entries && userId && (
             <details className="fold">
-              <summary>Fazer um lançamento (RH)</summary>
-              <EntryForm userId={Number(viewedId)} today={today} onDone={(t) => { setMsg({ type: "ok", text: t }); load(); }} onFail={(t) => setMsg({ type: "error", text: t })} />
+              <summary>Fazer um lançamento</summary>
+              <EntryForm userId={userId} today={today} onDone={(t) => { setMsg({ type: "ok", text: t }); void load(); onChange?.(); }}
+                onFail={(t) => setMsg({ type: "error", text: t })} />
             </details>
           )}
         </>
-      )}
-
-      {user?.role === "admin" && (
-        <details className="fold">
-          <summary>Regras do banco de horas (administrador)</summary>
-          <Settings onSaved={async () => { await reload(); setMsg({ type: "ok", text: "Configuração salva." }); load(); }} onFail={(t) => setMsg({ type: "error", text: t })} />
-        </details>
       )}
     </>
   );
@@ -177,33 +196,6 @@ function EntryForm({ userId, today, onDone, onFail }: { userId: number; today: s
       <label>Data<input type="date" required value={date} max={today} onChange={(e) => setDate(e.target.value)} /></label>
       <label>Motivo<textarea required minLength={5} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Ex.: folga compensatória de 12/08" /></label>
       <button className="primary" style={{ width: "100%" }}>Lançar</button>
-    </form>
-  );
-}
-
-function Settings({ onSaved, onFail }: { onSaved: () => void; onFail: (t: string) => void }) {
-  const { company } = useAuth();
-  const [limit, setLimit] = useState(company?.bank_max_minutes != null ? String(company.bank_max_minutes / 60) : "");
-  const [months, setMonths] = useState(String(company?.bank_expiry_months ?? 6));
-
-  async function save(e: FormEvent) {
-    e.preventDefault();
-    try {
-      await api("/company", { method: "PATCH", body: { bank_max_minutes: limit === "" ? null : Math.round(Number(limit) * 60), bank_expiry_months: Number(months) } });
-      onSaved();
-    } catch (err) {
-      onFail(err instanceof Error ? err.message : "Erro");
-    }
-  }
-
-  return (
-    <form onSubmit={save}>
-      <div className="grid2 keep">
-        <label>Limite do saldo (horas; vazio = sem)<input type="number" min="0" step="0.5" value={limit} onChange={(e) => setLimit(e.target.value)} /></label>
-        <label>Prazo para compensar (meses)<input type="number" min="1" max="12" value={months} onChange={(e) => setMonths(e.target.value)} /></label>
-      </div>
-      <p className="muted small">O prazo depende do instrumento adotado (acordo individual ou coletivo); confirme com a assessoria jurídica.</p>
-      <button>Salvar</button>
     </form>
   );
 }

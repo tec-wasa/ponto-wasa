@@ -3,12 +3,9 @@ import { ApiError, api, download } from "../api";
 import { useAuth } from "../auth";
 import type { AuditRow, Closing, ImportResult, Schedule, User } from "../types";
 import Kiosks from "./Kiosks";
+import Settings from "./Settings";
 import { ROLE_LABEL, currentMonth, fmtCpf, fmtDateTime, fmtMinutes, initials, shiftMonth, todayLocal } from "../util";
 
-type Tab = "usuarios" | "centrais" | "jornadas" | "fechamento" | "fiscalizacao" | "auditoria";
-const TABS: [Tab, string][] = [
-  ["usuarios", "Pessoas"], ["centrais", "Centrais"], ["jornadas", "Jornadas"], ["fechamento", "Fechamento"], ["fiscalizacao", "Fiscalização"], ["auditoria", "Auditoria"],
-];
 const DAYS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 const ACTION_LABEL: Record<string, string> = {
   create: "Criou", update: "Alterou", punch: "Marcação", approve: "Aprovou", reject: "Rejeitou", cancel: "Cancelou", export: "Exportou",
@@ -30,19 +27,18 @@ const ROLE_HELP: Record<string, string> = {
   admin: "tudo: cadastros, jornadas, Centrais, fechamento, configurações",
   hr: "ajustes, ausências, banco de horas, relatórios, exportações fiscais",
   manager: "aprova ajustes e ausências e vê a equipe",
-  auditor: "só leitura (fiscalização); não acumula com as outras",
 };
 
 /** Funções acumuláveis (Administrador + RH + Gestor na mesma pessoa) e se a pessoa registra ponto. */
 function RolePicker({ roles, tracks, onRoles, onTracks }: { roles: string[]; tracks: boolean; onRoles: (r: string[]) => void; onTracks: (t: boolean) => void }) {
   const toggle = (r: string) => {
     if (roles.includes(r)) return onRoles(roles.filter((x) => x !== r));
-    onRoles(r === "auditor" ? ["auditor"] : [...roles.filter((x) => x !== "auditor"), r]);
+    onRoles([...roles.filter((x) => x !== "auditor"), r]);
   };
   return (
     <fieldset style={{ gridColumn: "1 / -1", border: "1px solid var(--line, #ddd)", borderRadius: 8, padding: "8px 12px", margin: "8px 0" }}>
       <legend>Funções (marque quantas quiser)</legend>
-      {["admin", "hr", "manager", "auditor"].map((r) => (
+      {["admin", "hr", "manager"].map((r) => (
         <label key={r} style={{ display: "flex", gap: 8, alignItems: "flex-start", margin: "4px 0" }}>
           <input type="checkbox" checked={roles.includes(r)} onChange={() => toggle(r)} style={{ width: "auto", marginTop: 4 }} />
           <span><b>{ROLE_LABEL[r]}</b> <span className="muted small">— {ROLE_HELP[r]}</span></span>
@@ -56,25 +52,51 @@ function RolePicker({ roles, tracks, onRoles, onTracks }: { roles: string[]; tra
   );
 }
 
-export default function Admin() {
-  const { user } = useAuth();
-  const [tab, setTab] = useState<Tab>("usuarios");
-  const readOnly = user?.role === "auditor";
+function Tabs<T extends string>({ label, tabs, tab, onTab }: { label: string; tabs: [T, string][]; tab: T; onTab: (t: T) => void }) {
+  if (tabs.length < 2) return null;
+  return (
+    <div className="seg scroll-x" role="tablist" aria-label={label} style={{ margin: "14px 0" }}>
+      {tabs.map(([id, text]) => (
+        <button key={id} role="tab" aria-selected={tab === id} className={tab === id ? "on" : ""} onClick={() => onTab(id)}>{text}</button>
+      ))}
+    </div>
+  );
+}
+
+/** Gestão > Cadastros: pessoas, jornadas e centrais. */
+export default function Cadastros() {
+  const { can } = useAuth();
+  type T = "usuarios" | "jornadas" | "centrais";
+  const tabs = ([["usuarios", "Pessoas", can("people.list")], ["jornadas", "Jornadas", true], ["centrais", "Centrais", can("kiosks.view")]] as [T, string, boolean][])
+    .filter((t) => t[2]).map(([id, l]) => [id, l] as [T, string]);
+  const [tab, setTab] = useState<T>(tabs[0]?.[0] ?? "jornadas");
   return (
     <>
-      <h1 style={{ margin: 0 }}>Gestão</h1>
-      <div className="seg scroll-x" role="tablist" aria-label="Áreas da gestão" style={{ margin: "14px 0" }}>
-        {TABS.map(([id, label]) => (
-          <button key={id} role="tab" aria-selected={tab === id} className={tab === id ? "on" : ""} onClick={() => setTab(id)}>
-            {label}
-          </button>
-        ))}
-      </div>
-      {tab === "usuarios" && <Users readOnly={readOnly} />}
-      {tab === "jornadas" && <Schedules readOnly={readOnly} />}
-      {tab === "fechamento" && <Closings readOnly={readOnly} />}
+      <h1 style={{ margin: 0 }}>Cadastros</h1>
+      <Tabs label="Cadastros" tabs={tabs} tab={tab} onTab={setTab} />
+      {tab === "usuarios" && <Users readOnly={!can("people.manage")} />}
+      {tab === "jornadas" && <Schedules readOnly={!can("schedules.manage")} />}
+      {tab === "centrais" && <KiosksTab readOnly={!can("kiosks.manage")} />}
+    </>
+  );
+}
+
+/** Gestão > Empresa: fechamento do mês, fiscalização, configurações e auditoria (cada aba conforme a permissão). */
+export function Empresa() {
+  const { can } = useAuth();
+  type T = "fechamento" | "fiscalizacao" | "configuracoes" | "auditoria";
+  const tabs = ([
+    ["fechamento", "Fechamento", can("closing.view")], ["fiscalizacao", "Fiscalização", can("fiscal.export") || can("integrity.view")],
+    ["configuracoes", "Configurações", can("company.settings")], ["auditoria", "Auditoria", can("audit.view")],
+  ] as [T, string, boolean][]).filter((t) => t[2]).map(([id, l]) => [id, l] as [T, string]);
+  const [tab, setTab] = useState<T>(tabs[0]?.[0] ?? "fechamento");
+  return (
+    <>
+      <h1 style={{ margin: 0 }}>Empresa</h1>
+      <Tabs label="Empresa" tabs={tabs} tab={tab} onTab={setTab} />
+      {tab === "fechamento" && <Closings readOnly={!can("closing.manage")} />}
       {tab === "fiscalizacao" && <Compliance />}
-      {tab === "centrais" && <KiosksTab readOnly={readOnly} />}
+      {tab === "configuracoes" && <Settings />}
       {tab === "auditoria" && <Audit />}
     </>
   );
@@ -82,7 +104,7 @@ export default function Admin() {
 
 // --- Pessoas ------------------------------------------------------------------
 function Users({ readOnly }: { readOnly: boolean }) {
-  const { user } = useAuth();
+  const { user, can } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [f, setF] = useState({ name: "", email: "", password: "", cpf: "", roles: [] as string[], tracks_time: true, manager_id: "", schedule_id: "", admitted_at: "", job_title: "" });
@@ -230,7 +252,7 @@ function Users({ readOnly }: { readOnly: boolean }) {
   }
 
   // Funções acumuláveis na mesma pessoa; quem não marca "Registra ponto" só gere (sem espelho, banco de horas nem marcação).
-  const isAdmin = user?.role === "admin";
+  const isAdmin = can("people.permissions");
   const managers = users.filter((u) => u.active && ["admin", "hr", "manager"].includes(u.role));
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -613,10 +635,9 @@ function Schedules({ readOnly }: { readOnly: boolean }) {
 
 // --- Fechamento ---------------------------------------------------------------
 function Closings({ readOnly }: { readOnly: boolean }) {
-  const { company, user, reload } = useAuth();
+  const { company } = useAuth();
   const [list, setList] = useState<Closing[]>([]);
   const [month, setMonth] = useState(() => shiftMonth(currentMonth(company!.timezone), -1));
-  const [integrity, setIntegrity] = useState<{ ok: boolean; checked: number; problems: string[] } | null>(null);
   const [reopen, setReopen] = useState<string | null>(null);
   const n = useNotice();
 
@@ -641,7 +662,7 @@ function Closings({ readOnly }: { readOnly: boolean }) {
         <section className="card">
           <h2 className="section-title">Fechar mês</h2>
           <p className="muted small">
-            Exige que não haja ajustes ou ausências pendentes no mês e bloqueia novas alterações. Só o RH ou o administrador reabre,
+            Exige que não haja ajustes ou ausências pendentes no mês e bloqueia novas alterações. Só o RH ou a Administração reabrem,
             e a reabertura fica na auditoria.
           </p>
           <div className="row" style={{ flexWrap: "nowrap" }}>
@@ -676,38 +697,6 @@ function Closings({ readOnly }: { readOnly: boolean }) {
         </ul>
       </section>
 
-      {user?.role === "admin" && (
-        <section className="card" aria-labelledby="h-foto">
-          <h2 id="h-foto" className="section-title">Foto na batida</h2>
-          <p className="muted small">
-            Opcional. Cada pessoa autoriza a própria foto (LGPD); se a câmera falhar ou a pessoa recusar, o ponto é registrado do mesmo jeito.
-            As fotos são criptografadas, só o RH e o administrador as veem e <b>são apagadas quando o mês é fechado</b>. As marcações nunca são apagadas.
-          </p>
-          <label className="check">
-            <input type="checkbox" checked={!!company?.photo_enabled} onChange={async (e) => {
-              try {
-                await api("/company", { method: "PATCH", body: { photo_enabled: e.target.checked } });
-                await reload();
-                n.ok(e.target.checked ? "Foto na batida ativada." : "Foto na batida desativada (as já tiradas seguem até o fechamento do mês).");
-              } catch (err) {
-                n.fail(err);
-              }
-            }} />
-            <span>Permitir foto na batida nesta empresa</span>
-          </label>
-        </section>
-      )}
-
-      <section className="card">
-        <h2 className="section-title">Integridade das marcações</h2>
-        <p className="muted small">Confere se o NSR é contínuo e se a cadeia de hashes das marcações está intacta.</p>
-        <button onClick={() => api<typeof integrity>("/punches-integrity").then(setIntegrity).catch(n.fail)}>Verificar agora</button>
-        {integrity && (
-          <p className={`alert ${integrity.ok ? "ok" : "error"}`} role="status" style={{ marginTop: 12 }}>
-            {integrity.ok ? `Íntegro: ${integrity.checked} marcações verificadas.` : `Problemas: ${integrity.problems.join("; ")}`}
-          </p>
-        )}
-      </section>
     </>
   );
 }
@@ -752,7 +741,8 @@ function Audit() {
 
 // --- Fiscalização ---------------------------------------------------------------
 function Compliance() {
-  const { company } = useAuth();
+  const { company, can } = useAuth();
+  const [integrity, setIntegrity] = useState<{ ok: boolean; checked: number; problems: string[] } | null>(null);
   const tz = company!.timezone;
   const [start, setStart] = useState(() => `${shiftMonth(currentMonth(tz), -1)}-01`);
   const [end, setEnd] = useState(() => todayLocal(tz));
@@ -806,6 +796,19 @@ function Compliance() {
           <button className="primary" disabled={!!busy} onClick={() => get("aej")}>{busy === "aej" ? "Gerando…" : "Baixar AEJ"}</button>
         </div>
       </section>
+
+      {can("integrity.view") && (
+      <section className="card">
+        <h2 className="section-title">Integridade das marcações</h2>
+        <p className="muted small">Confere se o NSR é contínuo e se a cadeia de hashes das marcações está intacta.</p>
+        <button onClick={() => api<typeof integrity>("/punches-integrity").then(setIntegrity).catch(n.fail)}>Verificar agora</button>
+        {integrity && (
+          <p className={`alert ${integrity.ok ? "ok" : "error"}`} role="status" style={{ marginTop: 12 }}>
+            {integrity.ok ? `Íntegro: ${integrity.checked} marcações verificadas.` : `Problemas: ${integrity.problems.join("; ")}`}
+          </p>
+        )}
+      </section>
+      )}
     </>
   );
 }

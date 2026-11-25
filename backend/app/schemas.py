@@ -241,6 +241,8 @@ class AdjustmentOut(ORM):
     user_name: str | None = None
     target_kind: str | None = None
     target_at: datetime | None = None
+    can_decide: bool = False  # quem está vendo pode aprovar/rejeitar este pedido pendente
+    self_decision: bool = False  # ... e seria autoaprovação (justificativa obrigatória)
 
 
 class DecisionIn(BaseModel):

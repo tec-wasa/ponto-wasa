@@ -109,7 +109,14 @@ def list_absences(
     if status:
         q = q.where(Absence.status == status)
     rows = db.execute(q.order_by(Absence.start_date.desc(), Absence.id.desc()).limit(300)).all()
-    return [svc.serialize(actor, a, name) for a, name in rows]
+    owners = {u.id: u for u in db.execute(select(User).where(User.company_id == actor.company_id)).scalars()}
+    out = []
+    for a, name in rows:
+        item = svc.serialize(actor, a, name)
+        mode = perm.decision_mode(db, actor, owners[a.user_id]) if a.status == "pending" else None
+        item["can_decide"], item["self_decision"] = mode is not None, mode == "self"
+        out.append(item)
+    return out
 
 
 @router.post("/{absence_id}/decision")

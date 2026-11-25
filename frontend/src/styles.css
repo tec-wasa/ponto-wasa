@@ -395,3 +395,11 @@ label.check input { width: 22px; min-height: 22px; height: 22px; margin: 2px 0 0
 .badge-qr { width: min(80vw, 60vh, 420px); height: min(80vw, 60vh, 420px); background: #fff; }
 .badge-sub { font-weight: 700; font-size: 1.1rem; margin: 0; }
 .badge-hint { color: #5b6470; font-size: .9rem; max-width: 30ch; margin: 0; }
+
+/* Seletor de área (Meu ponto | Gestão), para quem bate ponto e também gere */
+.area-switch { display: inline-flex; gap: 2px; padding: 3px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); }
+.area-switch a {
+  padding: 6px 12px; border-radius: 999px; color: var(--text-muted); text-decoration: none; font-weight: 600; font-size: 13px; white-space: nowrap;
+}
+.area-switch a.on { background: var(--avatar-bg); color: var(--avatar-text); }
+@media (min-width: 768px) { .area-switch { margin-left: 16px; } }

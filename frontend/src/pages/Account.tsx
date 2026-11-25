@@ -7,7 +7,9 @@ import MyBadge from "./MyBadge";
 interface Tokens { access_token: string; refresh_token: string }
 
 export default function Account() {
-  const { user, company, restriction, twoFactor } = useAuth();
+  const { user, company, restriction, twoFactor, can, logout } = useAuth();
+  const funcs = (user?.roles ?? []).filter((r) => r !== "auditor").map((r) => ROLE_LABEL[r]);
+  const who = [...funcs, ...(can("punch") ? [] : ["não registra ponto"])].join(" · ") || "Colaborador";
   const forced = restriction === "password_change_required";
   return (
     <>
@@ -27,7 +29,7 @@ export default function Account() {
         <div>
           <strong>{user?.name}</strong>
           <div className="muted small">{user?.email}</div>
-          <div className="muted small">{user ? ROLE_LABEL[user.role] : ""}{company ? ` · ${company.name}` : ""}</div>
+          <div className="muted small">{who}{company ? ` · ${company.name}` : ""}</div>
         </div>
       </section>
 
@@ -43,9 +45,10 @@ export default function Account() {
             Segurança{twoFactor?.enabled ? " · 2FA ativo" : ""}
           </p>
           <TwoFactor />
-          <MyBadge />
+          {can("punch") && <MyBadge />}
         </>
       )}
+      <button style={{ width: "100%", marginTop: 20 }} onClick={logout}>Sair</button>
     </>
   );
 }

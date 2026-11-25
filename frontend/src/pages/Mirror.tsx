@@ -29,8 +29,10 @@ function dayParts(date: string): { num: string; week: string } {
   };
 }
 
-export default function Mirror() {
-  const { user, company } = useAuth();
+/** `self`: Meu ponto > Registros (o meu espelho e os comprovantes). `team`: Gestão > Espelhos (escolher a pessoa). */
+export default function Mirror({ mode = "self" }: { mode?: "self" | "team" }) {
+  const { user, company, can } = useAuth();
+  const team = mode === "team";
   const tz = company!.timezone;
   const [month, setMonth] = useState(() => currentMonth(tz));
   const [people, setPeople] = useState<User[]>([]);
@@ -44,17 +46,15 @@ export default function Mirror() {
   const [recent, setRecent] = useState<Punch[]>([]);
   const [photos, setPhotos] = useState<{ punch_id: number; kind: string; occurred_at: string; nsr: number }[]>([]);
   const [photoShown, setPhotoShown] = useState<{ id: number; url: string } | null>(null);
-  const canSeePhotos = !!user && ["hr", "admin"].includes(user.role) && !!company?.photo_enabled;
-
-  const canPickPerson = user && ["manager", "hr", "admin", "auditor"].includes(user.role);
+  const canSeePhotos = team && can("photos.view") && !!company?.photo_enabled;
 
   useEffect(() => {
-    if (!canPickPerson) return;
-    api<User[]>("/users").then(setPeople).catch(() => undefined);
-  }, [canPickPerson]);
+    if (!team) return;
+    api<User[]>("/users").then((u) => setPeople(u.filter((p) => p.id !== user?.id && p.tracks_time !== false))).catch(() => undefined);
+  }, [team, user?.id]);
 
   useEffect(() => {
-    if (user?.tracks_time === false && !target) { setData(null); return; }  // só gere: precisa escolher uma pessoa
+    if (team && !target) { setData(null); return; }  // gestão: primeiro escolher a pessoa
     let cancelled = false;
     setLoading(true);
     setError("");
@@ -65,9 +65,9 @@ export default function Mirror() {
     return () => {
       cancelled = true;
     };
-  }, [month, target]);
+  }, [month, target, team]);
 
-  const own = !target || target === user?.id;
+  const own = !team;
 
   useEffect(() => {
     if (own) api<Punch[]>("/punches?limit=20").then(setRecent).catch(() => undefined);
@@ -121,7 +121,7 @@ export default function Mirror() {
 
   return (
     <>
-      <h1>Espelho de ponto</h1>
+      <h1>{team ? "Espelhos" : "Meus registros"}</h1>
 
       <div className="month-nav">
         <button className="icon-btn" onClick={() => setMonth(shiftMonth(month, -1))} aria-label="Mês anterior">‹</button>
@@ -129,18 +129,16 @@ export default function Mirror() {
         <button className="icon-btn" onClick={() => setMonth(shiftMonth(month, 1))} aria-label="Próximo mês" disabled={month >= currentMonth(tz)}>›</button>
       </div>
 
-      {canPickPerson && (
+      {team && (
         <label>
           Colaborador
           <select value={target} onChange={(e) => setTarget(e.target.value ? Number(e.target.value) : "")}>
-            {user?.tracks_time !== false && <option value="">Eu ({user?.name})</option>}
-            {user?.tracks_time === false && <option value="">Escolha…</option>}
-            {people.filter((p) => p.id !== user?.id && p.tracks_time !== false).map((p) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
+            <option value="">Escolha…</option>
+            {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </label>
       )}
+      {team && !target && people.length === 0 && <p className="card muted">Ninguém para acompanhar ainda.</p>}
 
       {error && <p className="alert error" role="alert">{error}</p>}
       {loading && !data && <p className="muted" role="status">Carregando…</p>}
@@ -208,7 +206,7 @@ export default function Mirror() {
                     )}
                     {d.warnings.map((w) => <p className="warn small" key={w}>⚠ {w}</p>)}
                     {own && d.status !== "futuro" && (
-                      <Link className="day-action" to={`/ajustes?data=${d.date}`}>Pedir ajuste deste dia</Link>
+                      <Link className="day-action" to={`/solicitacoes?data=${d.date}`}>Pedir correção deste dia</Link>
                     )}
                   </div>
                 </details>
@@ -221,7 +219,7 @@ export default function Mirror() {
       {canSeePhotos && target && photos.length > 0 && (
         <section className="card" aria-labelledby="h-fotos">
           <h2 id="h-fotos" className="section-title">Fotos das batidas</h2>
-          <p className="muted small">Só você (RH/admin) vê. Cada consulta fica na auditoria e as fotos somem quando o mês é fechado.</p>
+          <p className="muted small">Só o RH e a Administração veem. Cada consulta fica na auditoria e as fotos somem quando o mês é fechado.</p>
           <ul className="plain">
             {photos.map((p) => (
               <li key={p.punch_id}>

@@ -1,12 +1,13 @@
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
+import type { NavItem } from "../App";
 import { useAuth } from "../auth";
 import { PWA_EVENT, install, isStandalone, pwa } from "../pwa";
 
-interface Props { reports: boolean; admin: boolean; onLogout: () => void }
+interface Props { items: NavItem[]; area: "mine" | "mgmt"; both: boolean; onLogout: () => void }
 
-/** Tudo o que não cabe nas 4 abas do celular. */
-export default function More({ reports, admin, onLogout }: Props) {
+/** Tudo o que não cabe nas abas do celular, da área atual. */
+export default function More({ items, area, both, onLogout }: Props) {
   const { user, company } = useAuth();
   const [, force] = useState(0);
   const [installMsg, setInstallMsg] = useState("");
@@ -16,13 +17,12 @@ export default function More({ reports, admin, onLogout }: Props) {
     return () => window.removeEventListener(PWA_EVENT, f);
   }, []);
   const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
-  const items = [
-    { to: "/ajustes", title: "Ajustes", hint: "Pedir inclusão ou correção de marcação" },
-    { to: "/ausencias", title: "Ausências", hint: "Atestados, abonos, férias e afastamentos" },
-    { to: "/banco", title: "Banco de horas", hint: "Saldo e extrato" },
-    ...(reports ? [{ to: "/relatorios", title: "Relatórios", hint: "Fechamento mensal, banco de horas e ausências" }] : []),
-    ...(admin ? [{ to: "/admin", title: "Gestão", hint: "Colaboradores, jornadas, fechamento e fiscalização" }] : []),
-    { to: "/conta", title: "Minha conta", hint: "Senha e verificação em duas etapas" },
+  const list = [
+    ...items.map((i) => ({ to: i.to, title: i.label, hint: i.hint })),
+    ...(both ? [area === "mine"
+      ? { to: "/gestao", title: "Ir para a Gestão", hint: "Equipe, aprovações, cadastros" }
+      : { to: "/", title: "Ir para Meu ponto", hint: "Registrar o meu ponto e ver os meus registros" }] : []),
+    { to: "/conta", title: "Minha conta", hint: "Dados de acesso e segurança" },
     { to: "/diagnostico", title: "Diagnóstico do aplicativo", hint: "Por que o app instala (ou não) e se funciona sem internet" },
   ];
   return (
@@ -44,7 +44,7 @@ export default function More({ reports, admin, onLogout }: Props) {
       )}
       <section className="card" style={{ padding: "4px 16px" }}>
         <ul className="more-list">
-          {items.map((i) => (
+          {list.map((i) => (
             <li key={i.to}>
               <Link to={i.to}><span>{i.title}<small>{i.hint}</small></span><span aria-hidden="true">›</span></Link>
             </li>

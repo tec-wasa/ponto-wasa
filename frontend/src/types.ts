@@ -127,6 +127,8 @@ export interface Adjustment {
   user_name?: string | null;
   target_kind?: string | null;
   target_at?: string | null;
+  can_decide?: boolean; // quem vê pode aprovar/rejeitar
+  self_decision?: boolean; // ... e seria autoaprovação (justificativa obrigatória)
 }
 
 export interface Schedule {
@@ -233,6 +235,8 @@ export interface Absence {
   decided_by: number | null;
   decision_note: string | null;
   created_by: number;
+  can_decide?: boolean;
+  self_decision?: boolean;
 }
 
 export interface TwoFactorStatus {

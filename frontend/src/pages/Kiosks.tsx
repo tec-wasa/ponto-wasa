@@ -25,8 +25,8 @@ function status(k: Kiosk): { label: string; cls: string } {
 
 /** Gestão > Centrais: aparelhos compartilhados onde as pessoas registram o ponto (tela /central). */
 export default function Kiosks({ readOnly, notify }: { readOnly: boolean; notify: { ok: (t: string) => void; fail: (e: unknown) => void } }) {
-  const { company, user, reload } = useAuth();
-  const isAdmin = user?.role === "admin";
+  const { can } = useAuth();
+  const isAdmin = can("kiosks.manage");
   const [list, setList] = useState<Kiosk[]>([]);
   const [fresh, setFresh] = useState<Paired | null>(null); // código de pareamento: aparece só agora
   const [confirm, setConfirm] = useState<string | null>(null);
@@ -114,16 +114,6 @@ export default function Kiosks({ readOnly, notify }: { readOnly: boolean; notify
     }
   }
 
-  async function togglePin(required: boolean) {
-    try {
-      await api("/company", { method: "PATCH", body: { kiosk_pin_required: required } });
-      await reload();
-      notify.ok(required ? "A Central passa a pedir o PIN." : "A Central não pede mais o PIN.");
-    } catch (err) {
-      notify.fail(err);
-    }
-  }
-
   const url = `${window.location.origin}/central`;
 
   return (
@@ -142,22 +132,6 @@ export default function Kiosks({ readOnly, notify }: { readOnly: boolean; notify
         </div>
       )}
 
-      {isAdmin && (
-        <section className="card" aria-labelledby="h-pin">
-          <h2 id="h-pin" className="section-title">Identificação na Central</h2>
-          <label className="check">
-            <input type="checkbox" checked={!!company?.kiosk_pin_required} onChange={(e) => void togglePin(e.target.checked)} />
-            <span>
-              Exigir PIN
-              <span className="muted small" style={{ display: "block", fontWeight: 400 }}>
-                Desligado (padrão): o código interno ou o CPF sozinho identifica a pessoa, então trate o código como uma senha. Ligado: a pessoa também
-                digita o PIN que definiu em Minha conta. O QR do aplicativo, que muda a cada 30 segundos, dispensa o PIN.
-              </span>
-            </span>
-          </label>
-          <p className="muted small" style={{ margin: "8px 0 0" }}>A foto é sempre obrigatória na Central. Sem ela, a pessoa usa o aplicativo.</p>
-        </section>
-      )}
 
       {list.length === 0 && <p className="muted">Nenhuma central cadastrada.</p>}
       {list.map((k) => {
@@ -240,7 +214,7 @@ export default function Kiosks({ readOnly, notify }: { readOnly: boolean; notify
           </form>
         </details>
       )}
-      {readOnly && !isAdmin && <p className="muted small">Somente o administrador cadastra e revoga centrais.</p>}
+      {readOnly && !isAdmin && <p className="muted small">Somente a Administração cadastra e revoga centrais.</p>}
     </>
   );
 }

@@ -93,10 +93,14 @@ def list_adjustments(
     names = {u.id: u.name for u in db.execute(select(User).where(User.company_id == actor.company_id)).scalars()}
     targets = {p.id: p for p in db.execute(
         select(Punch).where(Punch.id.in_([a.target_punch_id for a in rows if a.target_punch_id]))).scalars()} if rows else {}
+    owners = {u.id: u for u in db.execute(select(User).where(User.company_id == actor.company_id)).scalars()}
     out = []
     for a in rows:
         item = AdjustmentOut.model_validate(a)
         item.user_name = names.get(a.user_id)
+        if a.status == "pending":
+            mode = perm.decision_mode(db, actor, owners[a.user_id])
+            item.can_decide, item.self_decision = mode is not None, mode == "self"
         t = targets.get(a.target_punch_id)
         if t:
             item.target_kind, item.target_at = t.kind, t.occurred_at

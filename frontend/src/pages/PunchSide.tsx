@@ -1,12 +1,10 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import { api } from "../api";
 import { useAuth } from "../auth";
-import type { Dashboard, DashboardPerson, Mirror } from "../types";
+import type { Mirror } from "../types";
 import { fmtMinutes, parseUtc, todayLocal } from "../util";
 
 const WEEK = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
-const DOT: Record<string, string> = { presente: "working", em_intervalo: "break", sem_marcacao: "danger", incompleto: "danger", justificada: "working" };
 
 /** As 7 datas (AAAA-MM-DD) da semana de hoje, de segunda a domingo. */
 export function weekDates(today: string): string[] {
@@ -25,14 +23,12 @@ export function withOpenTime(bars: Bar[], open: { since: string; minutes: number
   return bars.map((b) => (b.date === day ? { ...b, worked: b.worked + open.minutes, partial: true } : b));
 }
 
-/** Coluna lateral do desktop (design.md): resumo semanal e equipe. No celular vira a faixa de chips da equipe. */
+/** Coluna lateral do desktop (design.md): resumo semanal da própria pessoa. A equipe fica na área Gestão. */
 /** `open`: turno em andamento (desde quando e quantos minutos), para o gráfico contar o tempo corrente. */
 export default function PunchSide({ refreshKey, open }: { refreshKey: number; open?: { since: string; minutes: number } }) {
-  const { user, company } = useAuth();
+  const { company } = useAuth();
   const tz = company!.timezone;
-  const isApprover = !!user && ["manager", "hr", "admin"].includes(user.role);
   const [bars, setBars] = useState<Bar[] | null>(null);
-  const [people, setPeople] = useState<DashboardPerson[]>([]);
 
   useEffect(() => {
     let alive = true;
@@ -57,36 +53,13 @@ export default function PunchSide({ refreshKey, open }: { refreshKey: number; op
     };
   }, [tz, refreshKey]);
 
-  useEffect(() => {
-    if (!isApprover) return;
-    let alive = true;
-    const load = () => api<Dashboard>("/dashboard").then((d) => alive && setPeople(d.people)).catch(() => undefined);
-    load();
-    const t = setInterval(load, 60_000);
-    return () => {
-      alive = false;
-      clearInterval(t);
-    };
-  }, [isApprover, refreshKey]);
-
   const shown = bars ? withOpenTime(bars, open, tz) : null;
   const max = Math.max(60, ...(shown ?? []).map((b) => Math.max(b.worked, b.expected)));
   const total = (shown ?? []).reduce((s, b) => s + b.worked, 0);
   const expected = (shown ?? []).reduce((s, b) => s + b.expected, 0);
-  const firstName = (n: string) => n.trim().split(/\s+/)[0];
 
   return (
     <aside className="punch-side" aria-label="Resumo">
-      {isApprover && people.length > 0 && (
-        <div className="team-chips" role="list" aria-label="Equipe agora">
-          {people.map((p) => (
-            <Link key={p.user_id} to={`/espelho?user=${p.user_id}`} className="chip-person" role="listitem" aria-label={`${p.name}: ${p.state_label}`}>
-              <span className={`dot ${DOT[p.state] ?? ""}`} aria-hidden="true" />{firstName(p.name)}
-            </Link>
-          ))}
-        </div>
-      )}
-
       {shown && (
         <section className="card side-week" aria-labelledby="h-semana">
           <h2 id="h-semana" className="section-title">Esta semana</h2>
@@ -103,23 +76,6 @@ export default function PunchSide({ refreshKey, open }: { refreshKey: number; op
         </section>
       )}
 
-      {isApprover && people.length > 0 && (
-        <section className="card side-team" aria-labelledby="h-equipe-side">
-          <h2 id="h-equipe-side" className="section-title">Equipe</h2>
-          <ul className="plain">
-            {people.slice(0, 8).map((p) => (
-              <li key={p.user_id}>
-                <Link to={`/espelho?user=${p.user_id}`} className="side-person">
-                  <span className={`dot ${DOT[p.state] ?? ""}`} aria-hidden="true" />
-                  <span className="side-name">{p.name}</span>
-                  <span className="muted small">{p.state_label}</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-          {people.length > 8 && <Link to="/equipe" className="small">Ver toda a equipe ({people.length})</Link>}
-        </section>
-      )}
     </aside>
   );
 }

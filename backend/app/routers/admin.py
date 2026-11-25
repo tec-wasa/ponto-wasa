@@ -1,5 +1,5 @@
 from datetime import UTC, datetime
-from zoneinfo import ZoneInfo
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse, Response
@@ -86,11 +86,21 @@ def patch_company(
               "timezone": company.timezone, "workplace": company.workplace, "photo_enabled": company.photo_enabled,
               "kiosk_pin_required": company.kiosk_pin_required}
     data = body.model_dump(exclude_unset=True)
-    for k, v in data.items():
+    if "name" in data and not (data["name"] or "").strip():
+        raise HTTPException(422, "Informe a razão social")
+    if "timezone" in data:
+        try:
+            ZoneInfo(data["timezone"] or "")
+        except (ValueError, KeyError, ZoneInfoNotFoundError):
+            raise HTTPException(422, "Fuso horário inválido") from None
+    changed = {k: v for k, v in data.items() if getattr(company, k) != v}
+    if not changed:
+        return company
+    for k, v in changed.items():
         setattr(company, k, v)
-    if set(data) & {"name", "caepf", "cno", "workplace"}:
+    if set(changed) & {"name", "caepf", "cno", "workplace"}:
         arp.record_employer(db, company, actor)  # tipo 2: alteração da identificação do empregador
-    audit.log(db, actor, "update", "company", company.id, before=before, after=data, ip=client_ip(request))
+    audit.log(db, actor, "update", "company", company.id, before={k: before.get(k) for k in changed}, after=changed, ip=client_ip(request))
     db.commit()
     return company
 

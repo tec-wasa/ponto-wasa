@@ -119,5 +119,14 @@ def self_approval_allowed(db: Session, actor: User, owner: User) -> bool:
     return actor.id == owner.id and ADMIN in funcs(actor) and not other_approvers(db, owner)
 
 
+def decision_mode(db: Session, actor: User, owner: User) -> str | None:
+    """Para a caixa de aprovações: "approve" (decide normalmente), "self" (autoaprovação com justificativa) ou None."""
+    if can_approve(actor, owner):
+        return "approve"
+    if self_approval_allowed(db, actor, owner):
+        return "self"
+    return None
+
+
 def requires_2fa(user: User) -> bool:
     return bool(funcs(user) & settings.require_2fa_role_set)

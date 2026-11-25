@@ -55,7 +55,7 @@ export default function Team() {
 
   return (
     <>
-      <h1 style={{ margin: 0 }}>Equipe</h1>
+      <h1 style={{ margin: 0 }}>Painel</h1>
       <p className="muted small" aria-live="polite" style={{ margin: "4px 0 14px" }}>
         {at ? `Situação em ${d} às ${t}` : `Agora, ${t} · atualiza a cada minuto`}
       </p>
@@ -74,7 +74,7 @@ export default function Team() {
 
           {attention > 0 && (
             <div className="attn" aria-label="Pontos de atenção">
-              {s.pending_adjustments > 0 && <Link to="/ajustes" className="pill">{s.pending_adjustments} ajuste(s) a aprovar</Link>}
+              {s.pending_adjustments > 0 && <Link to="/gestao/aprovacoes" className="pill">{s.pending_adjustments} ajuste(s) a aprovar</Link>}
               {s.late > 0 && <span className="pill warn-pill">{s.late} atrasado(s) hoje</span>}
               {s.bank_alerts > 0 && <span className="pill warn-pill">{s.bank_alerts} alerta(s) do banco</span>}
             </div>
@@ -85,7 +85,7 @@ export default function Team() {
       <section className="card" style={{ padding: "4px 16px" }}>
         {data && people.length === 0 && <p className="muted">Ninguém nesta situação.</p>}
         {people.map((p) => (
-          <Link key={p.user_id} to={`/espelho?user=${p.user_id}`} className="person" aria-label={`${p.name}: ${p.state_label}. Abrir espelho`}>
+          <Link key={p.user_id} to={`/gestao/espelhos?user=${p.user_id}`} className="person" aria-label={`${p.name}: ${p.state_label}. Abrir espelho`}>
             <span className="avatar" aria-hidden="true">{initials(p.name)}</span>
             <span className="person-main">
               <strong>{p.name}</strong>

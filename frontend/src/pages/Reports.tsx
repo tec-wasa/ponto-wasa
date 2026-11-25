@@ -4,7 +4,7 @@ import { useAuth } from "../auth";
 import { currentMonth, shiftMonth, todayLocal } from "../util";
 
 export default function Reports() {
-  const { company, user } = useAuth();
+  const { company, user, can } = useAuth();
   const [origin, setOrigin] = useState("all");
   const tz = company!.timezone;
   const today = todayLocal(tz);
@@ -48,7 +48,7 @@ export default function Reports() {
     <>
       <h1>Relatórios</h1>
       <p className="muted small" style={{ marginTop: -4 }}>
-        O gestor vê a própria equipe; RH, administrador e auditor veem a empresa. Cada emissão fica na auditoria.
+        {user?.scope === "team" ? "Os relatórios trazem a sua equipe." : "Os relatórios trazem a empresa toda."} Cada emissão fica na auditoria.
         O documento oficial de cada pessoa continua sendo o Espelho de Ponto.
       </p>
       {error && <p className="alert error" role="alert">{error}</p>}
@@ -98,7 +98,7 @@ export default function Reports() {
         {buttons("p", `/reports/punches?${new URLSearchParams({ start, end, origin })}`, `batidas-${start}-${end}`, !start || !end)}
       </section>
 
-      {user && ["hr", "admin", "auditor"].includes(user.role) && (
+      {can("reports.company") && (
         <section className="card" aria-labelledby="r-diverg">
           <h2 id="r-diverg" className="section-title">Divergências da Central</h2>
           <p className="muted small">Batidas fora do posto ou sem localização, falhas de identificação e aparelhos sem sinal. Não bloqueiam a batida: servem para conferência.</p>
