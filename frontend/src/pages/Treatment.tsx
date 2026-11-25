@@ -25,7 +25,7 @@ interface Data {
 
 const STATUS: Record<string, string> = {
   ok: "Regular", folga: "Folga", falta: "Falta", incompleto: "Incompleto", hoje: "Hoje", futuro: "—",
-  anterior: "Antes da admissão", justificada: "Justificada",
+  anterior: "Antes da admissão", justificada: "Justificada", feriado: "Feriado",
 };
 const ORDER = ["entrada", "inicio_intervalo", "fim_intervalo", "saida"];
 const INCLUDE_REASONS = ["Esqueceu de bater", "Trabalho externo", "Falha no aparelho", "Sem internet no momento"];
@@ -71,7 +71,7 @@ export default function Treatment() {
   const shown = useMemo(() => {
     const days = data?.days ?? [];
     if (view === "atencao") return days.filter(attention);
-    if (view === "uteis") return days.filter((d) => !["folga", "futuro", "anterior"].includes(d.status) || d.marks.length > 0);
+    if (view === "uteis") return days.filter((d) => !["folga", "feriado", "futuro", "anterior"].includes(d.status) || d.marks.length > 0);
     return days;
   }, [data, view]);
 

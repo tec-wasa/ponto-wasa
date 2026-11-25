@@ -32,5 +32,6 @@ GRANT SELECT, INSERT ON punches, arp_events, audit_log, hour_bank_entries TO pon
 -- Cadastros que o administrador pode excluir quando não têm histórico (a aplicação confere as regras; marcações, ajustes,
 -- ausências e banco de horas continuam sem DELETE).
 GRANT DELETE ON users, schedules, kiosks, kiosk_tickets TO ponto_app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON holidays TO ponto_app;  -- feriados estaduais/municipais da empresa
 
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO ponto_app;

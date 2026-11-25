@@ -20,7 +20,8 @@ from .punching import IN_KINDS
 KIND_LABEL = {"entrada": "Entrada", "saida": "Saída", "inicio_intervalo": "Intervalo", "fim_intervalo": "Retorno do intervalo"}
 WEEKDAYS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"]
 STATUS_LABEL = {"ok": "Regular", "folga": "Folga", "falta": "Falta", "incompleto": "Incompleto", "hoje": "Em andamento",
-                "futuro": "-", "anterior": "Antes da admissão", "justificada": "Ausência justificada"}
+                "futuro": "-", "anterior": "Antes da admissão", "justificada": "Ausência justificada",
+                "feriado": "Feriado"}
 
 
 def _hh_mm(hhmm4: str) -> str:
@@ -105,7 +106,7 @@ def build_espelho(db: Session, company: Company, user: User, year: int, month: i
         working = d.date.weekday() in contract["days"]
         rows.append({
             "date": d.date.isoformat(), "weekday": WEEKDAYS[d.date.weekday()],
-            "contract": contract["text"] if working else "Folga",
+            "contract": f"Feriado - {d.holiday}" if d.holiday else (contract["text"] if working else "Folga"),
             "rep": rep.get(d.date, []), "treated": treated.get(d.date, []),
             "worked": d.worked, "night": d.night_minutes, "reduced": d.reduced_minutes, "balance": d.balance,
             "status": STATUS_LABEL[d.status] + (f" ({d.justification})" if d.justification else ""), "warnings": d.warnings,

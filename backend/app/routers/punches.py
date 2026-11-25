@@ -1,5 +1,5 @@
 import re
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from .. import permissions as perm
 from ..config import settings
 from ..db import get_db
 from ..deps import can_view_user, client_ip, get_current_user, require, require_punch
@@ -198,6 +199,36 @@ def mirror(
 
     days = month_days(db, target, db.get(Company, target.company_id), int(month[:4]), int(month[5:]))
     return {"user_id": target.id, "month": month, **summarize(days)}
+
+
+@router.get("/mirror/folhas.pdf")
+def all_folhas(
+    request: Request, month: str = Query(..., description="YYYY-MM"),
+    actor: User = Depends(require("team.view")), db: Session = Depends(get_db),
+):
+    """Folhas de ponto do mês de todos que a pessoa acompanha (equipe ou empresa), num PDF só: uma página por pessoa."""
+    if not re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", month):
+        raise HTTPException(422, "Mês deve estar no formato YYYY-MM")
+    year, mon = int(month[:4]), int(month[5:])
+    first = date(year, mon, 1)
+    last = date(year + (mon == 12), mon % 12 + 1, 1) - timedelta(days=1)
+    company = db.get(Company, actor.company_id)
+    lo, hi = datetime(year, mon, 1), datetime(last.year, last.month, last.day) + timedelta(days=1)
+    with_punches = set(db.execute(select(Punch.user_id).where(Punch.company_id == company.id, Punch.occurred_at >= lo,
+                                                              Punch.occurred_at < hi)).scalars())
+    people = [u for u in db.execute(select(User).where(perm.scope_condition(actor, include_self=False), User.tracks_time.is_(True))
+                                    .order_by(User.name)).scalars()
+              if (u.active or u.id in with_punches) and (u.admitted_at or first) <= last]
+    if not people:
+        raise HTTPException(404, "Ninguém com folha de ponto neste mês")
+    if len(people) > 300:
+        raise HTTPException(413, "Pessoas demais para um PDF só (máximo 300)")
+    document = folha.folhas_pdf([folha.build_folha(db, company, u, year, mon) for u in people])
+    audit.log(db, actor, "export", "espelho", "lote", after={"month": month, "modelo": "folha", "count": len(people)},
+              ip=client_ip(request))
+    db.commit()
+    return Response(document, media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="folhas-de-ponto-{month}.pdf"'})
 
 
 @router.get("/mirror/official.pdf")

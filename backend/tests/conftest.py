@@ -9,6 +9,7 @@ from app import models  # noqa: F401
 from app.db import Base, get_db, make_engine
 from app.main import app
 from app.seed import create_company
+from app.services.holidays import national as _NATIONAL
 
 TEST_DB_URL = os.environ.get("PONTO_TEST_DATABASE_URL")  # ex.: postgresql+psycopg://ponto@127.0.0.1:5544/ponto_test
 
@@ -114,3 +115,17 @@ def world(client, db):
         "ids": {"hr": hr["id"], "mgr": mgr["id"], "emp": emp["id"], "other": other["id"]},
         "sched": sched,
     }
+
+
+@pytest.fixture(autouse=True)
+def _no_national_holidays(monkeypatch):
+    """Os testes usam datas relativas a hoje; um feriado nacional no meio mudaria "falta" para "feriado" conforme o dia.
+    Fora de test_feriados.py (que usa `real_holidays`), os nacionais ficam desligados."""
+    from app.services import holidays
+    monkeypatch.setattr(holidays, "national", lambda year: {})
+
+
+@pytest.fixture()
+def real_holidays(monkeypatch):
+    from app.services import holidays
+    monkeypatch.setattr(holidays, "national", _NATIONAL)

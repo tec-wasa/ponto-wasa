@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { api } from "../api";
 import { useAuth } from "../auth";
 import { useConfig } from "../google";
+import Holidays from "./Holidays";
 
 type Notice = { type: "ok" | "error"; text: string } | null;
 
@@ -26,6 +27,7 @@ export default function Settings() {
     <>
       {msg && <p className={`alert ${msg.type}`} role={msg.type === "error" ? "alert" : "status"}>{msg.text}</p>}
       <CompanyData onSave={save} />
+      <Holidays />
       <BankRules onSave={save} />
 
       <section className="card" aria-labelledby="h-foto">

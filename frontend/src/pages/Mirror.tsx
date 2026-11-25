@@ -7,13 +7,13 @@ import { KIND_LABEL, currentMonth, fmtDateTimeMin, fmtMinutes, fmtMonth, shiftMo
 
 const STATUS: Record<string, string> = {
   ok: "Regular", folga: "Folga", falta: "Falta", incompleto: "Incompleto", hoje: "Hoje", futuro: "—",
-  anterior: "Antes da admissão", justificada: "Justificada",
+  anterior: "Antes da admissão", justificada: "Justificada", feriado: "Feriado",
 };
 
 type View = "uteis" | "atencao" | "todos";
 
 const NEEDS_ATTENTION = (d: MirrorDay) => d.status === "falta" || d.status === "incompleto" || d.warnings.length > 0;
-const QUIET = ["folga", "futuro", "anterior"];
+const QUIET = ["folga", "feriado", "futuro", "anterior"];
 
 /** "08:00 entrada" -> ["08:00", "Entrada"] (o servidor manda o tipo cru). */
 function splitPunch(p: string): [string, string] {
@@ -111,6 +111,18 @@ export default function Mirror({ mode = "self" }: { mode?: "self" | "team" }) {
     }
   }
 
+  async function allFolhas() {
+    setPdfBusy(true);
+    setError("");
+    try {
+      await download(`/mirror/folhas.pdf?month=${month}`, `folhas-de-ponto-${month}.pdf`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erro ao gerar as folhas");
+    } finally {
+      setPdfBusy(false);
+    }
+  }
+
   const t = data?.totals;
   const attention = useMemo(() => (data?.days ?? []).filter(NEEDS_ATTENTION), [data]);
   const shown = useMemo(() => {
@@ -140,6 +152,11 @@ export default function Mirror({ mode = "self" }: { mode?: "self" | "team" }) {
         </label>
       )}
       {team && !target && people.length === 0 && <p className="card muted">Ninguém para acompanhar ainda.</p>}
+      {team && (
+        <p className="small" style={{ margin: "0 0 12px" }}>
+          <button className="link" style={{ padding: 0 }} disabled={pdfBusy} onClick={allFolhas}>Folhas de ponto de todos de {fmtMonth(month)} (um PDF, uma página por pessoa)</button>
+        </p>
+      )}
       {team && target && can("approvals") && (
         <p className="small" style={{ margin: "0 0 12px" }}><Link to={`/gestao/tratamento?user=${target}&mes=${month}`}>Corrigir este mês em Tratamento →</Link></p>
       )}
@@ -193,6 +210,7 @@ export default function Mirror({ mode = "self" }: { mode?: "self" | "team" }) {
                       <span>
                         <span className={`tag ${d.status}`}>{STATUS[d.status]}</span>
                         {d.justification && <span className="muted small"> {d.justification}</span>}
+                        {d.holiday && <span className="muted small"> {d.holiday}</span>}
                         {flag && d.status !== "falta" && d.status !== "incompleto" && <span className="tag falta" style={{ marginLeft: 4 }}>Alerta</span>}
                       </span>
                       <span className="muted small day-times">{times.length ? times.join(" · ") : "Sem marcações"}</span>

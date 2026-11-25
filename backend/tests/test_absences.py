@@ -113,8 +113,10 @@ def test_multi_day_hr_registration_is_approved_immediately_and_skips_weekends(cl
     assert r.status_code == 201 and r.json()["status"] == "approved"
     days = client.get(f"/mirror?month={monday:%Y-%m}", headers=world["emp"]).json()["days"]
     week = [d for d in days if monday.isoformat() <= d["date"] <= sunday.isoformat()]
-    assert [d["status"] for d in week] == ["justificada"] * 5 + ["folga"] * 2  # fim de semana continua folga
-    assert all(d["justification"] == "Férias" for d in week[:5])
+    # fim de semana continua folga; um feriado na semana aparece como feriado (a data do teste varia com o dia de hoje)
+    assert all(d["status"] in ("justificada", "feriado") for d in week[:5])
+    assert all(d["status"] in ("folga", "feriado") for d in week[5:])
+    assert all(d["justification"] == "Férias" for d in week[:5] if d["status"] == "justificada")
 
 
 # ------------------------------- permissões ----------------------------------

@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..models import Absence, Adjustment, Company, Punch, Schedule, User
+from .holidays import company_holidays
 from .timecalc import DayResult, Justification, ScheduleRule, compute_month
 
 
@@ -70,7 +71,7 @@ def month_days(db: Session, user: User, company: Company, year: int, month: int)
     admission = user.admitted_at or user.created_at.replace(tzinfo=ZoneInfo("UTC")).astimezone(zone).date()
     first, last = date(year, month, 1), date(year + (month == 12), month % 12 + 1, 1) - timedelta(days=1)
     return compute_month(valid, schedule_rule(sched), company.timezone, year, month, today, start=admission,
-                         justified=justifications(db, user, first, last))
+                         justified=justifications(db, user, first, last), holidays=company_holidays(db, company, first, last))
 
 
 def summarize(days: list[DayResult]) -> dict:
@@ -86,7 +87,8 @@ def summarize(days: list[DayResult]) -> dict:
         },
         "days": [
             {"date": d.date.isoformat(), "expected": d.expected, "worked": d.worked, "balance": d.balance,
-             "status": d.status, "punches": d.punches, "warnings": d.warnings, "justification": d.justification}
+             "status": d.status, "punches": d.punches, "warnings": d.warnings, "justification": d.justification,
+             "holiday": d.holiday}
             for d in days
         ],
     }

@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from .. import permissions as perm
 from ..models import Absence, Adjustment, Company, Punch, Schedule, User
+from .holidays import company_holidays
 from .mirror import schedule_rule
 from .punching import IN_KINDS
 
@@ -52,7 +53,8 @@ def person_state(db: Session, company: Company, user: User, at: datetime, voided
     sched = db.get(Schedule, user.schedule_id) if user.schedule_id else None
     rule = schedule_rule(sched)
     start_min = _hm(sched.start_time) if sched else 8 * 60
-    working = day.weekday() in rule.weekdays
+    holiday = company_holidays(db, company, day, day).get(day)
+    working = day.weekday() in rule.weekdays and not holiday
 
     def local(p: Punch) -> datetime:
         return p.occurred_at.replace(tzinfo=utc).astimezone(zone)

@@ -47,7 +47,20 @@ class Company(Base):
     workplace: Mapped[str | None] = mapped_column(String(300), default=None)  # local de prestação do serviço
     photo_enabled: Mapped[bool] = mapped_column(Boolean, default=False)  # foto opcional na batida (consentimento por pessoa)
     kiosk_pin_required: Mapped[bool] = mapped_column(Boolean, default=False)
-    password_login: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())  # False = só "Entrar com Google"  # a Central pede o PIN (configurável; padrão: não)
+    password_login: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())  # False = só "Entrar com Google"
+    holiday_carnaval: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())  # segunda e terça de Carnaval
+    holiday_corpus_christi: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())  # a Central pede o PIN (configurável; padrão: não)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class Holiday(Base):
+    """Feriado estadual, municipal ou da própria empresa (os nacionais são calculados em services/holidays.py)."""
+    __tablename__ = "holidays"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
+    day: Mapped[date] = mapped_column("date", Date)
+    name: Mapped[str] = mapped_column(String(100))
+    recurring: Mapped[bool] = mapped_column(Boolean, default=True)  # repete todo ano no mesmo dia e mês
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 

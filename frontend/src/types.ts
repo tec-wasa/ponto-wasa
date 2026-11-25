@@ -98,8 +98,9 @@ export interface MirrorDay {
   expected: number;
   worked: number;
   balance: number;
-  status: "ok" | "folga" | "falta" | "incompleto" | "hoje" | "futuro" | "anterior" | "justificada";
+  status: "ok" | "folga" | "feriado" | "falta" | "incompleto" | "hoje" | "futuro" | "anterior" | "justificada";
   justification?: string | null;
+  holiday?: string | null;
   punches: string[];
   warnings: string[];
 }

@@ -85,11 +85,11 @@ def build_folha(db: Session, company: Company, user: User, year: int, month: int
     faltas = 0
     for d in days:
         j = just.get(d.date)
-        contract = rule.daily_minutes if d.date.weekday() in rule.weekdays else 0
+        contract = rule.daily_minutes if d.date.weekday() in rule.weekdays and not d.holiday else 0
         abono = 0
         if j and d.status not in ("anterior", "futuro"):
             abono = contract if j.minutes is None else min(j.minutes, contract)
-        expected = d.expected + abono if d.status not in ("anterior", "futuro", "folga") else (d.expected if d.status == "folga" else 0)
+        expected = d.expected + abono if d.status not in ("anterior", "futuro", "folga", "feriado") else 0
         times = []
         for p in d.punches:
             hhmm = p[:5]
@@ -97,6 +97,8 @@ def build_folha(db: Session, company: Company, user: User, year: int, month: int
         if times:
             pairs = [" ".join(times[i:i + 2]) for i in range(0, len(times), 2)]
             pontos = " | ".join(pairs) + " |"
+        elif d.status == "feriado":
+            pontos = f"Feriado - {d.holiday}"
         elif d.status == "justificada":
             pontos = d.justification or "Ausência justificada"
         elif d.status == "falta":
@@ -176,13 +178,32 @@ def _pair(pdf: FPDF, label: str, value: str, x: float, y: float, lw: float, vw: 
     pdf.cell(vw, 5, _fit(pdf, value, vw, size - 1) if vw else latin1_safe(value))
 
 
-def folha_pdf(f: dict) -> bytes:
+def _new_doc() -> FPDF:
     pdf = FPDF(orientation="P", format="A4")
     pdf.set_title(latin1_safe("Folha de Ponto"))
     pdf.set_author("Ponto")
     pdf.set_auto_page_break(False)
+    pdf.set_margins(10, 10, 10)
+    return pdf
+
+
+def folha_pdf(f: dict) -> bytes:
+    pdf = _new_doc()
+    draw_folha(pdf, f)
+    return bytes(pdf.output())
+
+
+def folhas_pdf(items: list[dict]) -> bytes:
+    """Várias folhas num PDF só (uma página por pessoa), para imprimir e colher as assinaturas de uma vez."""
+    pdf = _new_doc()
+    for f in items:
+        draw_folha(pdf, f)
+    return bytes(pdf.output())
+
+
+def draw_folha(pdf: FPDF, f: dict) -> None:
+    """Desenha a folha de uma pessoa numa página nova do documento."""
     L, R, T = 10, 10, 10
-    pdf.set_margins(L, T, R)
     pdf.add_page()
     W = pdf.w - L - R
     first, last = f["period"]
@@ -351,4 +372,3 @@ def folha_pdf(f: dict) -> bytes:
     pdf.cell(60, 4, f"{f['issued_at']:%d/%m/%Y %H:%M}")
     pdf.set_xy(L + W - 40, pdf.h - 10)
     pdf.cell(38, 4, latin1_safe("Página 1 de 1"), align="R")
-    return bytes(pdf.output())

@@ -54,8 +54,9 @@ class DayResult:
     night_minutes: int = 0  # minutos reais trabalhados entre 22h e 5h
     reduced_minutes: int = 0  # duração considerando a hora noturna reduzida
     balance: int = 0
-    status: str = "ok"  # ok|folga|falta|incompleto|hoje|futuro|anterior|justificada
+    status: str = "ok"  # ok|folga|feriado|falta|incompleto|hoje|futuro|anterior|justificada
     justification: str | None = None
+    holiday: str | None = None  # nome do feriado do dia (jornada prevista zero)
     punches: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
 
@@ -69,6 +70,7 @@ def compute_month(
     today: date,
     start: date | None = None,
     justified: dict[date, Justification] | None = None,
+    holidays: dict[date, str] | None = None,
 ) -> list[DayResult]:
     """`punches`: (occurred_at UTC naive, kind) válidos (sem desconsiderados), qualquer ordem.
 
@@ -76,6 +78,8 @@ def compute_month(
     `justified`: ausências aprovadas por dia. Dia inteiro justificado sem marcações vira "justificada" (sem falta nem
     saldo); com marcações, a jornada esperada é zero (o que foi trabalhado conta como saldo). Justificativa parcial
     (em minutos) reduz a jornada esperada, mas só vale se houve marcações (sem marcações continua sendo falta).
+    `holidays`: feriados por dia. Num feriado a jornada prevista é zero: sem marcações vira "feriado"; o que for trabalhado
+    entra como saldo positivo (hora extra).
     """
     zone = ZoneInfo(tz)
     local = sorted(
@@ -114,7 +118,8 @@ def compute_month(
             days[d].punches.append(f"{when:%H:%M} {kind}")
 
     for d, res in days.items():
-        working = d.weekday() in rule.weekdays
+        res.holiday = (holidays or {}).get(d)
+        working = d.weekday() in rule.weekdays and not res.holiday
         res.expected = rule.daily_minutes if working else 0
         day_pairs = pairs.get(d, [])
         just = (justified or {}).get(d)
@@ -143,6 +148,8 @@ def compute_month(
             res.status = "hoje"
         elif res.justification and not res.punches and just.minutes is None:
             res.status = "justificada"
+        elif res.holiday and not res.punches:
+            res.status = "feriado"
         elif res.expected == 0 and not res.punches:
             res.status = "folga"
         elif res.expected > 0 and not res.punches:
