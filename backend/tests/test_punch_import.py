@@ -88,6 +88,13 @@ def test_import_errors_are_all_or_nothing(client, world, db, monkeypatch):
     assert db.query(Adjustment).count() == 0
 
 
+def test_import_accepts_excel_time_formats(client, world, db, monkeypatch):
+    monkeypatch.setattr("app.routers.imports._now", lambda: NOW)
+    csv = f"cpf;data;batida_1;batida_2\n{cpf(db, world['ids']['emp'])};05/11/2026;8:25;12:43:00\n"
+    j = send(client, world["hr"], csv).json()
+    assert j["errors"] == [] and j["marks"] == 2
+
+
 def test_import_permissions_and_closed_month(client, world, db, monkeypatch):
     monkeypatch.setattr("app.routers.imports._now", lambda: NOW)
     csv = f"cpf;data;batida_1;batida_2\n{cpf(db, world['ids']['emp'])};03/10/2026;08:00;12:00\n"

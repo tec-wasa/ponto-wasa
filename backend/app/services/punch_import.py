@@ -25,7 +25,7 @@ from .punching import month_is_closed
 
 MAX_ROWS = 3000
 TAG_PREFIX = "Importação "
-TIME = re.compile(r"^(?:\(m\))?([01]\d|2[0-3]):([0-5]\d)$")
+TIME = re.compile(r"^(?:\(m\))?([01]?\d|2[0-3]):([0-5]\d)(?::[0-5]\d)?$")  # 08:25, 8:25 ou 08:25:00 (Excel)
 
 
 def _norm(text: str) -> str:
@@ -138,7 +138,7 @@ def parse(db: Session, company: Company, text: str, now: datetime) -> Result:
         if bad:
             res.errors.append(Issue(line, f"Horário inválido: {', '.join(bad)} (use HH:MM)", who))
             continue
-        times = ["{}:{}".format(*TIME.match(r).groups()) for r in raw]
+        times = ["{:0>2}:{}".format(*TIME.match(r).groups()) for r in raw]
         if times != sorted(times) or len(set(times)) != len(times):
             res.errors.append(Issue(line, "Os horários do dia precisam estar em ordem crescente e sem repetição", who))
             continue
