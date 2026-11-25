@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import type { NavItem } from "../App";
 import { useAuth } from "../auth";
 import { PWA_EVENT, install, isStandalone, pwa } from "../pwa";
+import InstallAdvice from "../components/InstallAdvice";
+import { browserKind } from "../browser";
 
 interface Props { items: NavItem[]; area: "mine" | "mgmt"; both: boolean; onLogout: () => void }
 
@@ -16,7 +18,6 @@ export default function More({ items, area, both, onLogout }: Props) {
     window.addEventListener(PWA_EVENT, f);
     return () => window.removeEventListener(PWA_EVENT, f);
   }, []);
-  const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
   const list = [
     ...items.map((i) => ({ to: i.to, title: i.label, hint: i.hint })),
     ...(both ? [area === "mine"
@@ -33,12 +34,10 @@ export default function More({ items, area, both, onLogout }: Props) {
       {!isStandalone() && (
         <section className="card">
           <h2 className="section-title">Instalar o aplicativo</h2>
-          {pwa.prompt ? (
+          {pwa.prompt && browserKind() !== "in-app" ? (
             <button className="primary" style={{ width: "100%" }} onClick={async () => setInstallMsg((await install()) === "accepted" ? "Instalado!" : "")}>Instalar aplicativo</button>
-          ) : ios ? (
-            <p className="muted small" style={{ margin: 0 }}>No iPhone: toque em Compartilhar e depois em “Adicionar à Tela de Início”.</p>
           ) : (
-            <p className="muted small" style={{ margin: 0 }}>O navegador ainda não liberou a instalação. Abra o Diagnóstico abaixo para ver o motivo.</p>
+            <InstallAdvice />
           )}
           {installMsg && <p className="alert ok" role="status" style={{ marginTop: 12 }}>{installMsg}</p>}
         </section>

@@ -194,7 +194,26 @@ export const TOPICS: Topic[] = [
       },
       {
         h: "A instalação não aparece?",
-        text: "Abra Mais > **Diagnóstico do aplicativo**. A tela mostra, item por item, se o navegador liberou a instalação e se o app consegue funcionar sem internet.",
+        list: [
+          "**Link aberto pelo WhatsApp, Instagram ou e-mail**: esses apps abrem o link num navegador interno, que não instala e não funciona sem internet. O Ponto avisa na tela de entrada: toque em **Abrir no Chrome** (Android) ou use o menu > **Abrir no Safari** (iPhone). É a causa mais comum.",
+          "**iPhone**: instale pelo **Safari**. Em outros navegadores do iPhone, toque em **Copiar endereço** e cole no Safari.",
+          "**Internet Samsung, Firefox, Mi Browser e outros**: se o menu não tiver Instalar, abra no **Chrome**.",
+          "**Aba anônima**: não instala e apaga tudo ao fechar. Abra numa aba normal.",
+          "**Pouco espaço no aparelho**: o app precisa guardar os arquivos dele. Libere espaço e abra de novo.",
+          "**Celular muito antigo** (Android anterior ao 8 ou iOS anterior ao 16): atualize o Chrome ou o sistema; se não der, a pessoa bate o ponto na Central ou com internet.",
+        ],
+      },
+      {
+        text: "Abra Mais > **Diagnóstico do aplicativo**. A tela mostra o navegador detectado, como instalar nesse aparelho e, item por item, se o app consegue funcionar sem internet. Uma linha vermelha é o motivo.",
+      },
+      {
+        h: "Funcionar sem internet",
+        steps: [
+          "Abra o app **com internet** e entre na sua conta pelo menos uma vez no aparelho.",
+          "Recarregue a página uma vez (ou feche e abra o app). No Diagnóstico, **Aplicativo guardado para uso sem internet** deve ficar verde.",
+          "Pronto: sem conexão, o app abre e guarda as batidas (veja **Registrar sem internet**).",
+        ],
+        tip: "Instalar não é obrigatório para funcionar sem internet no Android, mas ajuda: o aparelho protege os dados do app contra limpeza automática. No iPhone, use sempre pelo ícone da Tela de Início: o que fica guardado no Safari e no ícone são separados.",
       },
     ],
   },

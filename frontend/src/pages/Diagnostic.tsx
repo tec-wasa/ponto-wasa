@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { PWA_EVENT, isStandalone, pwa } from "../pwa";
+import { browserKind } from "../browser";
+import InstallAdvice from "../components/InstallAdvice";
 
 interface Check {
   label: string;
@@ -40,6 +42,14 @@ export default function Diagnostic() {
       const out: Check[] = [];
       const add = (label: string, ok: boolean | null, detail: string) => out.push({ label, ok, detail });
 
+      const kind = browserKind();
+      const KIND: Record<string, string> = {
+        "in-app": "Navegador interno de outro aplicativo (WhatsApp, Instagram…): não instala. Abra no Chrome ou no Safari",
+        "ios-safari": "Safari no iPhone/iPad", "ios-other": "Outro navegador no iPhone: prefira o Safari para instalar",
+        "android-chrome": "Chrome no Android", "android-samsung": "Internet Samsung", "android-firefox": "Firefox no Android",
+        "android-other": "Navegador pouco comum no Android: prefira o Chrome", desktop: "Computador",
+      };
+      add("Navegador", kind === "in-app" ? false : kind === "ios-other" || kind === "android-other" ? null : true, KIND[kind]);
       add("Endereço seguro (HTTPS)", window.isSecureContext, `${location.protocol}//${location.host} — o Chrome só instala em HTTPS (ou localhost)`);
       add("Aberto como aplicativo instalado", null, isStandalone() ? "Sim: já está instalado" : "Não: aberto no navegador");
 
@@ -59,6 +69,15 @@ export default function Diagnostic() {
       } catch {
         add("Aplicativo guardado para uso sem internet", false, "Cache indisponível neste contexto");
       }
+
+      const est = await guard(navigator.storage?.estimate?.() ?? Promise.resolve(undefined), undefined);
+      if (est?.quota !== undefined) {
+        const freeMb = Math.round(((est.quota ?? 0) - (est.usage ?? 0)) / 1048576);
+        add("Espaço para guardar o app", freeMb > 50, `${freeMb} MB disponíveis${freeMb <= 50 ? ": libere espaço no aparelho" : ""}`);
+      }
+      const persisted = await guard(navigator.storage?.persisted?.() ?? Promise.resolve(false), false);
+      add("Dados protegidos contra limpeza automática", persisted ? true : null,
+        persisted ? "Sim" : "Não garantido: o aparelho pode apagar os dados se faltar espaço (instalar o app ajuda)");
 
       const m = await head("/manifest.webmanifest");
       add("Manifesto do aplicativo", m.ok && /json/.test(m.type), `HTTP ${m.status} ${m.type}`);
@@ -88,6 +107,7 @@ export default function Diagnostic() {
     <main style={{ maxWidth: 640 }}>
       <h1>Diagnóstico do aplicativo</h1>
       <p className="muted small">Cada linha é uma exigência para instalar o app e usá-lo sem internet. Se alguma estiver vermelha, é ela o motivo.</p>
+      {!isStandalone() && <section className="card"><h2 className="section-title" style={{ marginTop: 0 }}>Como instalar neste aparelho</h2><InstallAdvice /></section>}
       <section className="card" style={{ padding: "4px 16px" }}>
         <ul className="plain">
           {checks.length === 0 && <li className="muted">Verificando…</li>}

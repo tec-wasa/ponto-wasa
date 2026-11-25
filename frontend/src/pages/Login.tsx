@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import InstallAdvice from "../components/InstallAdvice";
 import { Link } from "react-router-dom";
 import { ApiError } from "../api";
 import { useAuth } from "../auth";
@@ -52,6 +53,7 @@ export default function Login() {
     <main style={{ maxWidth: 420, paddingTop: "12vh" }}>
       <h1>Ponto</h1>
       <p className="muted">Entre para registrar e acompanhar sua jornada.</p>
+      <InstallAdvice compact />
       <section className="card">
         {error && <p className="alert error" role="alert">{error}</p>}
         {hasGoogle && !askOtp && (

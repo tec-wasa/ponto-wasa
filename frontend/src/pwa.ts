@@ -27,6 +27,8 @@ window.addEventListener("appinstalled", () => {
 export function registerServiceWorker(): void {
   if (!import.meta.env.PROD || !("serviceWorker" in navigator)) return;
   window.addEventListener("load", () => {
+    // Pede ao navegador para não apagar os dados do app (batidas guardadas sem internet) quando faltar espaço.
+    void navigator.storage?.persist?.().catch(() => false);
     navigator.serviceWorker.register("/sw.js").catch((e) => {
       pwa.swError = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
       notify();
