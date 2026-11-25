@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from ..config import settings
 from ..db import get_db
-from ..deps import MANAGEMENT_ROLES, can_view_user, client_ip, get_current_user, require_roles
+from ..deps import can_view_user, client_ip, get_current_user, require, require_punch
 from ..models import Company, Kiosk, Punch, User
 from ..schemas import PunchIn, PunchOut, ReceiptOut
 from ..services import audit, clock, pdfsign, signing
@@ -91,6 +91,7 @@ def punch(body: PunchIn, request: Request, user: User = Depends(get_current_user
 @router.get("/punches/next")
 def next_punch(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """Qual é a próxima marcação (pela ordem) e se a jornada tem intervalo. É só uma dica para a tela."""
+    require_punch(user)
     kind = next_kind(db, user, _now())
     with_break = has_break(db, user)
     closed = day_closed(db, user, db.get(Company, user.company_id), _now())
@@ -178,7 +179,7 @@ def server_time():
 
 
 @router.get("/punches-integrity")
-def integrity(user: User = Depends(require_roles(*MANAGEMENT_ROLES, "auditor")), db: Session = Depends(get_db)):
+def integrity(user: User = Depends(require("integrity.view")), db: Session = Depends(get_db)):
     """Verifica NSR contínuo (todos os tipos de registro) e a cadeia de hashes das marcações (RF-29)."""
     return verify_chain(db, user.company_id)
 

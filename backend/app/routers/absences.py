@@ -3,20 +3,18 @@ from datetime import UTC, date, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
-from sqlalchemy import or_, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from .. import permissions as perm
 from ..db import get_db
-from ..deps import client_ip, get_current_user
+from ..deps import authorize_decision, client_ip, get_current_user, require_punch
 from ..models import Absence, Company, User
 from ..services import absences as svc
 from ..services import audit
 from ..services.hourbank import today_local
 
 router = APIRouter(prefix="/absences", tags=["ausências"])
-
-HR = ("hr", "admin")
-
 
 class AbsenceIn(BaseModel):
     kind: str
@@ -52,11 +50,15 @@ def create_absence(
     on_behalf = bool(body.user_id) and body.user_id != actor.id
     target = actor
     if on_behalf:
-        if actor.role not in HR:
-            raise HTTPException(403, "Só o RH registra ausência em nome de outro colaborador")
+        if not perm.can(actor, "absences.register"):
+            raise HTTPException(403, "Só o RH ou a Administração registram ausência em nome de outra pessoa")
         target = db.get(User, body.user_id)
         if not target or target.company_id != actor.company_id or not target.active:
             raise HTTPException(404, "Colaborador não encontrado")
+        if not target.tracks_time:
+            raise HTTPException(422, "Esta pessoa não registra ponto: não há ausência a justificar")
+    else:
+        require_punch(actor)
 
     problem = svc.validate_period(body.kind, body.start_date, body.end_date, body.minutes)
     if problem:
@@ -98,10 +100,10 @@ def list_absences(
     actor: User = Depends(get_current_user), db: Session = Depends(get_db),
 ):
     q = select(Absence, User.name).join(User, User.id == Absence.user_id).where(Absence.company_id == actor.company_id)
-    if mine or actor.role in ("employee", "auditor"):
+    if mine or not perm.can(actor, "team.view"):
         q = q.where(Absence.user_id == actor.id)
-    elif actor.role == "manager":
-        q = q.where(or_(Absence.user_id == actor.id, User.manager_id == actor.id))
+    else:
+        q = q.where(perm.scope_condition(actor))
     if user_id:
         q = q.where(Absence.user_id == user_id)
     if status:
@@ -119,18 +121,15 @@ def decide(
     if not a or a.company_id != actor.company_id:
         raise HTTPException(404, "Ausência não encontrada")
     owner = db.get(User, a.user_id)
-    if not (actor.role in HR or (actor.role == "manager" and owner.manager_id == actor.id)):
-        raise HTTPException(403, "Sem permissão para decidir esta ausência")
-    if a.user_id == actor.id:
-        raise HTTPException(403, "Não é permitido aprovar a própria ausência")
+    own = authorize_decision(db, actor, owner, body.note, "pedido de ausência")
     if a.status != "pending":
         raise HTTPException(409, "Ausência já decidida")
     _guard_closed(db, db.get(Company, a.company_id), a.start_date, a.end_date)
 
     a.status = "approved" if body.approve else "rejected"
     a.decided_by, a.decided_at, a.decision_note = actor.id, _now(), body.note
-    audit.log(db, actor, "approve" if body.approve else "reject", "absence", a.id, ip=client_ip(request),
-              before={"status": "pending"}, after={"status": a.status})
+    audit.log(db, actor, ("self_" if own else "") + ("approve" if body.approve else "reject"), "absence", a.id, ip=client_ip(request),
+              before={"status": "pending"}, after={"status": a.status, "self_approval": own, "note": body.note if own else None})
     db.commit()
     return svc.serialize(actor, a, owner.name)
 
@@ -142,7 +141,7 @@ def cancel(absence_id: int, request: Request, actor: User = Depends(get_current_
     if not a or a.company_id != actor.company_id:
         raise HTTPException(404, "Ausência não encontrada")
     owner_pending = a.user_id == actor.id and a.status == "pending"
-    if not (owner_pending or actor.role in HR):
+    if not (owner_pending or perm.can(actor, "absences.register")):
         raise HTTPException(403, "Sem permissão para cancelar esta ausência")
     if a.status not in ("pending", "approved"):
         raise HTTPException(409, "Esta ausência não pode mais ser cancelada")

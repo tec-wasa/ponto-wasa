@@ -187,7 +187,7 @@ def test_official_mirror_pdf_endpoint(client, world, treated_day):
     assert client.get(f"/mirror/official.pdf?month={month}&user_id={uid}", headers=world["adminB"]).status_code == 404
     assert client.get("/mirror/official.pdf?month=2026-13", headers=world["emp"]).status_code == 422
     assert client.get(f"/mirror/official.pdf?month={month}").status_code == 401
-    trail = client.get("/audit?entity=espelho", headers=world["hr"]).json()
+    trail = client.get("/audit?entity=espelho", headers=world["admin"]).json()
     assert trail and trail[0]["action"] == "export"
 
 

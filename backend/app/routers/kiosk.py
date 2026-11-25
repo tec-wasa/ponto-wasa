@@ -11,9 +11,10 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
+from .. import permissions as perm
 from ..config import settings
 from ..db import get_db
-from ..deps import MANAGEMENT_ROLES, client_ip, get_current_user, require_roles
+from ..deps import client_ip, get_current_user, require, require_punch
 from ..models import AuditLog, Company, Kiosk, KioskTicket, Punch, User
 from ..security import verify_password
 from ..services import audit, badges, clock, photos
@@ -21,7 +22,6 @@ from ..services import kiosk as svc
 from ..services.punching import KIND_LABEL, PunchError, day_closed, has_break, month_of, next_kind, register_punch
 
 router = APIRouter(tags=["central do ponto"])
-PRIVILEGED = ("admin", "auditor", "hr")
 
 
 def _now() -> datetime:
@@ -344,7 +344,7 @@ def _own(db: Session, actor: User, kiosk_id: int) -> Kiosk:
 
 
 @router.post("/kiosks", status_code=201)
-def create_kiosk(body: KioskIn, request: Request, actor: User = Depends(require_roles("admin")), db: Session = Depends(get_db)):
+def create_kiosk(body: KioskIn, request: Request, actor: User = Depends(require("kiosks.manage")), db: Session = Depends(get_db)):
     active = db.execute(select(func.count()).select_from(Kiosk).where(Kiosk.company_id == actor.company_id, Kiosk.active.is_(True))).scalar_one()
     if active >= settings.kiosk_max_per_company:
         raise HTTPException(409, f"Limite de {settings.kiosk_max_per_company} centrais ativas. Revogue uma para cadastrar outra.")
@@ -359,7 +359,7 @@ def create_kiosk(body: KioskIn, request: Request, actor: User = Depends(require_
 
 
 @router.get("/kiosks")
-def list_kiosks(actor: User = Depends(require_roles(*MANAGEMENT_ROLES, "auditor")), db: Session = Depends(get_db)):
+def list_kiosks(actor: User = Depends(require("kiosks.view")), db: Session = Depends(get_db)):
     company = db.get(Company, actor.company_id)
     zone = ZoneInfo(company.timezone)
     day = datetime.now(zone).replace(hour=0, minute=0, second=0, microsecond=0)
@@ -371,7 +371,7 @@ def list_kiosks(actor: User = Depends(require_roles(*MANAGEMENT_ROLES, "auditor"
 
 
 @router.patch("/kiosks/{kiosk_id}")
-def patch_kiosk(kiosk_id: int, body: KioskPatch, request: Request, actor: User = Depends(require_roles("admin")),
+def patch_kiosk(kiosk_id: int, body: KioskPatch, request: Request, actor: User = Depends(require("kiosks.manage")),
                 db: Session = Depends(get_db)):
     k = _own(db, actor, kiosk_id)
     data = body.model_dump(exclude_unset=True)
@@ -384,7 +384,7 @@ def patch_kiosk(kiosk_id: int, body: KioskPatch, request: Request, actor: User =
 
 
 @router.delete("/kiosks/{kiosk_id}", status_code=204)
-def delete_kiosk(kiosk_id: int, request: Request, actor: User = Depends(require_roles("admin")), db: Session = Depends(get_db)):
+def delete_kiosk(kiosk_id: int, request: Request, actor: User = Depends(require("kiosks.manage")), db: Session = Depends(get_db)):
     """Remove da lista uma central JÁ REVOGADA. As batidas feitas nela continuam (aparecem como "Central <número>")."""
     k = _own(db, actor, kiosk_id)
     if k.active:
@@ -398,7 +398,7 @@ def delete_kiosk(kiosk_id: int, request: Request, actor: User = Depends(require_
 
 
 @router.post("/kiosks/{kiosk_id}/pairing")
-def repair_kiosk(kiosk_id: int, request: Request, actor: User = Depends(require_roles("admin")), db: Session = Depends(get_db)):
+def repair_kiosk(kiosk_id: int, request: Request, actor: User = Depends(require("kiosks.manage")), db: Session = Depends(get_db)):
     """Novo código de pareamento: o aparelho atual perde o acesso (útil se o tablet for trocado)."""
     k = _own(db, actor, kiosk_id)
     if not k.active:
@@ -411,7 +411,7 @@ def repair_kiosk(kiosk_id: int, request: Request, actor: User = Depends(require_
 
 
 @router.post("/kiosks/{kiosk_id}/revoke")
-def revoke_kiosk(kiosk_id: int, request: Request, actor: User = Depends(require_roles("admin")), db: Session = Depends(get_db)):
+def revoke_kiosk(kiosk_id: int, request: Request, actor: User = Depends(require("kiosks.manage")), db: Session = Depends(get_db)):
     k = _own(db, actor, kiosk_id)
     k.active, k.token_hash, k.pairing_hash, k.pairing_expires_at, k.revoked_at = False, None, None, None, _now()
     audit.log(db, actor, "revoke", "kiosk", k.id, ip=client_ip(request))
@@ -424,13 +424,15 @@ def _target(db: Session, actor: User, user_id: int) -> User:
     u = db.get(User, user_id)
     if not u or u.company_id != actor.company_id:
         raise HTTPException(404, "Usuário não encontrado")
-    if u.role in PRIVILEGED and actor.role != "admin":
-        raise HTTPException(403, "Somente o administrador altera este usuário")
+    if perm.is_privileged(u) and not perm.can(actor, "people.permissions"):
+        raise HTTPException(403, "Somente a Administração altera quem tem função de gestão")
+    if not u.tracks_time:
+        raise HTTPException(422, "Esta pessoa não registra ponto: não tem crachá nem PIN")
     return u
 
 
 @router.get("/users/{user_id}/badge")
-def user_badge(user_id: int, actor: User = Depends(require_roles(*MANAGEMENT_ROLES)), db: Session = Depends(get_db)):
+def user_badge(user_id: int, actor: User = Depends(require("badges.manage")), db: Session = Depends(get_db)):
     """Código interno e conteúdo do QR do crachá impresso (o PDF/impressão vem na tela de Gestão)."""
     u = _target(db, actor, user_id)
     code = svc.assign_code(db, u)
@@ -443,7 +445,7 @@ def _badge_person(db: Session, u: User) -> dict:
 
 
 @router.get("/users/{user_id}/badge.pdf")
-def user_badge_pdf(user_id: int, request: Request, actor: User = Depends(require_roles(*MANAGEMENT_ROLES)),
+def user_badge_pdf(user_id: int, request: Request, actor: User = Depends(require("badges.manage")),
                    db: Session = Depends(get_db)):
     u = _target(db, actor, user_id)
     company = db.get(Company, actor.company_id)
@@ -454,15 +456,13 @@ def user_badge_pdf(user_id: int, request: Request, actor: User = Depends(require
 
 
 @router.get("/badges.pdf")
-def all_badges_pdf(request: Request, ids: list[int] | None = Query(None), actor: User = Depends(require_roles(*MANAGEMENT_ROLES)),
+def all_badges_pdf(request: Request, ids: list[int] | None = Query(None), actor: User = Depends(require("badges.manage")),
                    db: Session = Depends(get_db)):
     """Crachás de várias pessoas de uma vez (todas as ativas, ou as de `ids`). RH não imprime os de RH, admin e auditor."""
     q = select(User).where(User.company_id == actor.company_id, User.active.is_(True), User.tracks_time.is_(True)).order_by(User.name)
     if ids:
         q = q.where(User.id.in_(ids))
-    if actor.role != "admin":
-        q = q.where(User.role.notin_(PRIVILEGED))
-    people = list(db.execute(q).scalars())
+    people = [u for u in db.execute(q).scalars() if not perm.is_privileged(u) or perm.can(actor, "people.permissions")]
     company = db.get(Company, actor.company_id)
     data = badges.badges_pdf(company.name, [_badge_person(db, u) for u in people])
     audit.log(db, actor, "badge_print", "user", "lote", after={"count": len(people)}, ip=client_ip(request))
@@ -471,7 +471,7 @@ def all_badges_pdf(request: Request, ids: list[int] | None = Query(None), actor:
 
 
 @router.post("/users/{user_id}/badge/regenerate")
-def regenerate(user_id: int, request: Request, actor: User = Depends(require_roles(*MANAGEMENT_ROLES)), db: Session = Depends(get_db)):
+def regenerate(user_id: int, request: Request, actor: User = Depends(require("badges.manage")), db: Session = Depends(get_db)):
     u = _target(db, actor, user_id)
     svc.regenerate_badge(u)
     audit.log(db, actor, "badge_regenerate", "user", u.id, ip=client_ip(request))
@@ -480,7 +480,7 @@ def regenerate(user_id: int, request: Request, actor: User = Depends(require_rol
 
 
 @router.post("/users/{user_id}/pin-reset")
-def pin_reset(user_id: int, request: Request, actor: User = Depends(require_roles(*MANAGEMENT_ROLES)), db: Session = Depends(get_db)):
+def pin_reset(user_id: int, request: Request, actor: User = Depends(require("badges.manage")), db: Session = Depends(get_db)):
     u = _target(db, actor, user_id)
     u.pin_hash, u.pin_set_at, u.pin_fails, u.pin_locked_until = None, None, 0, None
     audit.log(db, actor, "pin_reset", "user", u.id, ip=client_ip(request))
@@ -491,6 +491,7 @@ def pin_reset(user_id: int, request: Request, actor: User = Depends(require_role
 @router.get("/auth/badge")
 def my_badge(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """Meu código interno e se tenho PIN. O código não é segredo por si só quando a empresa não exige PIN: trate como senha."""
+    require_punch(user)
     code = svc.assign_code(db, user)
     db.commit()
     company = db.get(Company, user.company_id)
@@ -500,6 +501,7 @@ def my_badge(user: User = Depends(get_current_user), db: Session = Depends(get_d
 @router.get("/auth/badge-qr")
 def my_rotating_badge(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """QR do aplicativo: muda a cada 30 s e vale uma única vez por janela."""
+    require_punch(user)
     svc.assign_code(db, user)
     payload, expires_in = svc.rotating_badge(user)
     db.commit()
@@ -514,6 +516,7 @@ class PinIn(BaseModel):
 @router.post("/auth/pin")
 def set_my_pin(body: PinIn, request: Request, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """Define ou troca o PIN. Pede a senha atual: quem pegar a sessão aberta não consegue trocar o PIN."""
+    require_punch(user)
     if not verify_password(body.password, user.password_hash):
         raise HTTPException(403, "Senha atual incorreta")
     try:

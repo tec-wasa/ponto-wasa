@@ -8,13 +8,12 @@ from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from ..db import get_db
-from ..deps import MANAGEMENT_ROLES, client_ip, require_roles
+from ..deps import client_ip, require
 from ..models import Company, User
 from ..services import aej, afd, audit, clock, signing
 
 router = APIRouter(prefix="/exports", tags=["fiscalização"])
 
-ROLES = (*MANAGEMENT_ROLES, "auditor")  # Art. 81 §2 e Art. 85: entrega ao Auditor-Fiscal do Trabalho
 
 
 TEST_WARNING = "Arquivo de teste: sem registro no INPI e sem identificacao do desenvolvedor; invalido para fiscalizacao"
@@ -53,7 +52,7 @@ def _generate(kind: str, builder, request: Request, actor: User, db: Session, st
 @router.get("/afd")
 def export_afd(
     request: Request, start: date = Query(...), end: date = Query(...), signed: bool = False,
-    actor: User = Depends(require_roles(*ROLES)), db: Session = Depends(get_db),
+    actor: User = Depends(require("fiscal.export")), db: Session = Depends(get_db),
 ):
     """Arquivo Fonte de Dados do período (datas no fuso da empresa). `signed=true` devolve .zip com o .p7s."""
     return _generate("afd", afd.build_afd, request, actor, db, start, end, signed)
@@ -62,14 +61,14 @@ def export_afd(
 @router.get("/aej")
 def export_aej(
     request: Request, start: date = Query(...), end: date = Query(...), signed: bool = False,
-    actor: User = Depends(require_roles(*ROLES)), db: Session = Depends(get_db),
+    actor: User = Depends(require("fiscal.export")), db: Session = Depends(get_db),
 ):
     """Arquivo Eletrônico de Jornada do período."""
     return _generate("aej", aej.build_aej, request, actor, db, start, end, signed)
 
 
 @router.get("/status")
-def export_status(actor: User = Depends(require_roles(*ROLES)), db: Session = Depends(get_db)):
+def export_status(actor: User = Depends(require("fiscal.export")), db: Session = Depends(get_db)):
     """Pré-requisitos para gerar arquivos conformes: o que falta configurar."""
     from ..config import settings
 

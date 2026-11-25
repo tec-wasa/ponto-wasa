@@ -7,8 +7,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from .. import permissions as perm
 from ..db import get_db
-from ..deps import MANAGEMENT_ROLES, can_view_user, client_ip, get_current_user, require_roles
+from ..deps import authorize_decision, client_ip, get_current_user, require, require_punch
 from ..models import Absence, Adjustment, AuditLog, Closing, Company, Punch, User
 from ..schemas import AdjustmentIn, AdjustmentOut, DecisionIn
 from ..services import absences as absence_svc
@@ -37,8 +38,9 @@ def create_adjustment(
     target_user = actor
     if body.user_id and body.user_id != actor.id:
         target_user = db.get(User, body.user_id)
-        if not target_user or actor.role not in ("manager", *MANAGEMENT_ROLES) or not can_view_user(db, actor, target_user):
+        if not target_user or not perm.can(actor, "approvals") or not perm.in_scope(actor, target_user):
             raise HTTPException(403, "Sem permissão para abrir ajuste para este colaborador")
+    require_punch(target_user)
     company = db.get(Company, actor.company_id)
 
     if body.kind == "incluir":
@@ -81,11 +83,10 @@ def list_adjustments(
     db: Session = Depends(get_db),
 ):
     q = select(Adjustment).where(Adjustment.company_id == actor.company_id)
-    if mine or actor.role in ("employee", "auditor"):
+    if mine or not perm.can(actor, "team.view"):
         q = q.where(Adjustment.user_id == actor.id)
-    elif actor.role == "manager":
-        team = select(User.id).where(User.manager_id == actor.id)
-        q = q.where(Adjustment.user_id.in_(team))
+    else:
+        q = q.where(Adjustment.user_id.in_(select(User.id).where(perm.scope_condition(actor))))
     if status:
         q = q.where(Adjustment.status == status)
     rows = db.execute(q.order_by(Adjustment.id.desc())).scalars().all()
@@ -112,11 +113,7 @@ def decide(
     if not adj or adj.company_id != actor.company_id:
         raise HTTPException(404, "Ajuste não encontrado")
     owner = db.get(User, adj.user_id)
-    is_manager_of = actor.role == "manager" and owner.manager_id == actor.id
-    if not (is_manager_of or actor.role in MANAGEMENT_ROLES):
-        raise HTTPException(403, "Sem permissão para decidir este ajuste")
-    if adj.user_id == actor.id:
-        raise HTTPException(403, "Não é permitido aprovar o próprio ajuste")
+    own = authorize_decision(db, actor, owner, body.note, "ajuste")
     if adj.status != "pending":
         raise HTTPException(409, "Ajuste já decidido")
 
@@ -137,8 +134,8 @@ def decide(
                 raise HTTPException(409, "Marcação já desconsiderada")
     adj.status = "approved" if body.approve else "rejected"
     adj.decided_by, adj.decided_at, adj.decision_note = actor.id, _now(), body.note
-    audit.log(db, actor, "approve" if body.approve else "reject", "adjustment", adj.id,
-              before={"status": "pending"}, after={"status": adj.status, "note": body.note},
+    audit.log(db, actor, ("self_" if own else "") + ("approve" if body.approve else "reject"), "adjustment", adj.id,
+              before={"status": "pending"}, after={"status": adj.status, "note": body.note, "self_approval": own},
               ip=client_ip(request))
     db.commit()
     return adj
@@ -152,7 +149,7 @@ def _valid_month(month: str) -> str:
 
 
 @router.get("/closings")
-def list_closings(actor: User = Depends(require_roles(*MANAGEMENT_ROLES, "auditor")), db: Session = Depends(get_db)):
+def list_closings(actor: User = Depends(require("closing.view")), db: Session = Depends(get_db)):
     rows = db.execute(
         select(Closing).where(Closing.company_id == actor.company_id).order_by(Closing.month.desc())
     ).scalars()
@@ -161,7 +158,7 @@ def list_closings(actor: User = Depends(require_roles(*MANAGEMENT_ROLES, "audito
 
 @router.post("/closings/{month}")
 def close_month(
-    month: str, request: Request, actor: User = Depends(require_roles(*MANAGEMENT_ROLES)),
+    month: str, request: Request, actor: User = Depends(require("closing.manage")),
     db: Session = Depends(get_db),
 ):
     _valid_month(month)
@@ -206,7 +203,7 @@ def close_month(
 
 @router.post("/closings/{month}/reopen")
 def reopen_month(
-    month: str, request: Request, actor: User = Depends(require_roles(*MANAGEMENT_ROLES)),
+    month: str, request: Request, actor: User = Depends(require("closing.manage")),
     db: Session = Depends(get_db),
 ):
     _valid_month(month)
@@ -226,7 +223,7 @@ def reopen_month(
 @router.get("/audit")
 def audit_trail(
     entity: str | None = None, limit: int = Query(100, le=500),
-    actor: User = Depends(require_roles(*MANAGEMENT_ROLES, "auditor")), db: Session = Depends(get_db),
+    actor: User = Depends(require("audit.view")), db: Session = Depends(get_db),
 ):
     q = select(AuditLog).where(AuditLog.company_id == actor.company_id)
     if entity:

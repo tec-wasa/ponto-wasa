@@ -103,6 +103,11 @@ class UserOut(ORM):
         return [r for r in v.split(",") if r] if isinstance(v, str) else (v or [])
 
 
+class MeOut(UserOut):
+    permissions: list[str] = []  # ações permitidas (ver app/permissions.py)
+    scope: str = "self"  # alcance na gestão: self | team | company
+
+
 class CompanyOut(ORM):
     id: int
     name: str

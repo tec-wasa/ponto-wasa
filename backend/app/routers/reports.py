@@ -7,13 +7,12 @@ from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from ..db import get_db
-from ..deps import MANAGEMENT_ROLES, client_ip, require_roles
+from ..deps import client_ip, require
 from ..models import Company, User
 from ..services import audit, reports
 
 router = APIRouter(prefix="/reports", tags=["relatórios"])
 
-ROLES = ("manager", *MANAGEMENT_ROLES, "auditor")
 FORMATS = {"csv": ("text/csv; charset=utf-8", "csv"), "pdf": ("application/pdf", "pdf")}
 
 
@@ -39,7 +38,7 @@ def _run(builder):
 @router.get("/monthly")
 def monthly(
     request: Request, month: str = Query(..., description="YYYY-MM"), format: str = "csv",
-    actor: User = Depends(require_roles(*ROLES)), db: Session = Depends(get_db),
+    actor: User = Depends(require("team.view")), db: Session = Depends(get_db),
 ):
     """Consolidado do mês por colaborador: horas, saldo, faltas, justificativas e banco de horas."""
     if not re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", month):
@@ -53,7 +52,7 @@ def monthly(
 @router.get("/hour-bank")
 def hour_bank(
     request: Request, format: str = "csv",
-    actor: User = Depends(require_roles(*ROLES)), db: Session = Depends(get_db),
+    actor: User = Depends(require("team.view")), db: Session = Depends(get_db),
 ):
     """Posição atual do banco de horas de quem o utiliza."""
     company = db.get(Company, actor.company_id)
@@ -65,7 +64,7 @@ def hour_bank(
 @router.get("/absences")
 def absences(
     request: Request, start: date = Query(...), end: date = Query(...), status: str | None = None, format: str = "csv",
-    actor: User = Depends(require_roles(*ROLES)), db: Session = Depends(get_db),
+    actor: User = Depends(require("team.view")), db: Session = Depends(get_db),
 ):
     """Ausências que tocam o período. O motivo de atestado e afastamento só aparece para RH e administrador."""
     company = db.get(Company, actor.company_id)
@@ -77,7 +76,7 @@ def absences(
 @router.get("/punches")
 def punches_by_origin(
     request: Request, start: date = Query(...), end: date = Query(...), origin: str = "all", format: str = "csv",
-    actor: User = Depends(require_roles(*ROLES)), db: Session = Depends(get_db),
+    actor: User = Depends(require("team.view")), db: Session = Depends(get_db),
 ):
     """Batidas do período no escopo do emitente, filtráveis por origem (all, app ou central)."""
     company = db.get(Company, actor.company_id)
@@ -89,7 +88,7 @@ def punches_by_origin(
 @router.get("/kiosk-divergences")
 def kiosk_divergences(
     request: Request, start: date = Query(...), end: date = Query(...), format: str = "csv",
-    actor: User = Depends(require_roles("hr", "admin", "auditor")), db: Session = Depends(get_db),
+    actor: User = Depends(require("reports.company")), db: Session = Depends(get_db),
 ):
     """Central: batidas fora do posto ou sem localização, falhas de identificação e aparelhos sem sinal."""
     company = db.get(Company, actor.company_id)

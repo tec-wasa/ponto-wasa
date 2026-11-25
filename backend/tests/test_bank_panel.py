@@ -109,7 +109,7 @@ def test_entries_are_append_only_and_audited(client, world, bank, db, engine):
     for sql in ("UPDATE hour_bank_entries SET minutes = 1", "DELETE FROM hour_bank_entries"):
         with engine.begin() as conn, pytest.raises(DatabaseError):
             conn.execute(text(sql))
-    trail = client.get("/audit?entity=hour_bank_entry", headers=world["hr"]).json()
+    trail = client.get("/audit?entity=hour_bank_entry", headers=world["admin"]).json()
     assert trail and trail[0]["action"] == "create" and trail[0]["after"]["minutes"] == 45
     # corrigir = lançar o contrário
     assert entry(client, world["hr"], bank, "compensacao", 45, AUG[11], "Estorno do crédito lançado por engano").status_code == 201

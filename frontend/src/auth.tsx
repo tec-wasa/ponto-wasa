@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { api, clearApiCache, getTokens, setTokens } from "./api";
-import type { Company, TwoFactorStatus, User } from "./types";
+import type { Company, Permission, TwoFactorStatus, User } from "./types";
 
 interface TokenPair {
   access_token: string;
@@ -17,6 +17,10 @@ interface AuthState {
   login: (email: string, password: string, otp?: string) => Promise<void>;
   logout: () => void;
   reload: () => Promise<void>;
+  /** A pessoa pode fazer esta ação? (única regra de exibição; o servidor confere de novo) */
+  can: (p: Permission) => boolean;
+  /** Tem alguma permissão de gestão (área Gestão)? */
+  manages: boolean;
   /** Troca a sessão por uma nova (depois de trocar a senha ou mudar o 2FA, as demais sessões caem). */
   applyTokens: (t: TokenPair) => Promise<void>;
 }
@@ -91,9 +95,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       ? "two_factor_required"
       : null;
 
+  const can = useCallback((p: Permission) => !!user?.permissions?.includes(p), [user]);
+  const manages = !!user?.permissions?.some((p) => p !== "punch");
+
   const value = useMemo(
-    () => ({ user, company, twoFactor, restriction, loading, login, logout, reload, applyTokens }),
-    [user, company, twoFactor, restriction, loading, login, logout, reload, applyTokens],
+    () => ({ user, company, twoFactor, restriction, loading, login, logout, reload, applyTokens, can, manages }),
+    [user, company, twoFactor, restriction, loading, login, logout, reload, applyTokens, can, manages],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

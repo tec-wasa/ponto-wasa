@@ -296,7 +296,7 @@ def test_approved_inclusion_is_treatment_not_an_arp_record(client, world):
     days = client.get(f"/mirror?month={month}", headers=world["emp"]).json()["days"]
     day = next(d for d in days if d["date"] == (when - timedelta(hours=3)).strftime("%Y-%m-%d"))
     assert any("entrada" in p for p in day["punches"])  # mas o espelho considera a inclusão
-    trail = client.get("/audit?entity=adjustment", headers=world["hr"]).json()
+    trail = client.get("/audit?entity=adjustment", headers=world["admin"]).json()
     assert {t["action"] for t in trail} == {"create", "approve"}
 
 
@@ -352,7 +352,7 @@ def test_closing_blocks_pending_then_blocks_changes_and_reopens(client, world):
 
     assert client.post(f"/closings/{month}/reopen", headers=world["hr"]).status_code == 200
     assert _request_inclusion(client, world["emp"], when).status_code == 201
-    actions = [t["action"] for t in client.get("/audit?entity=closing", headers=world["hr"]).json()]
+    actions = [t["action"] for t in client.get("/audit?entity=closing", headers=world["admin"]).json()]
     assert set(actions) == {"close", "reopen"}
 
 
@@ -363,7 +363,7 @@ def test_cannot_close_current_month(client, world):
 
 def test_audit_is_restricted(client, world):
     assert client.get("/audit", headers=world["emp"]).status_code == 403
-    assert client.get("/audit", headers=world["hr"]).status_code == 200
+    assert client.get("/audit", headers=world["admin"]).status_code == 200
 
 
 def test_single_button_sequence_follows_order_and_the_fourth_punch_closes_the_day(client, world, db):

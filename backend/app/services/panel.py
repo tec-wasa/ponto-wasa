@@ -9,6 +9,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from .. import permissions as perm
 from ..models import Absence, Adjustment, Company, Punch, Schedule, User
 from .mirror import schedule_rule
 from .punching import IN_KINDS
@@ -117,10 +118,9 @@ def person_state(db: Session, company: Company, user: User, at: datetime, voided
 
 
 def scope_users(db: Session, actor: User) -> list[User]:
-    q = select(User).where(User.company_id == actor.company_id, User.active.is_(True), User.id != actor.id,
+    """Quem a pessoa acompanha na gestão (equipe ou empresa), entre quem registra ponto; nunca ela mesma."""
+    q = select(User).where(perm.scope_condition(actor, include_self=False), User.active.is_(True),
                            User.role != "auditor", User.tracks_time.is_(True))
-    if actor.role == "manager":
-        q = q.where(User.manager_id == actor.id)
     return list(db.execute(q.order_by(User.name)).scalars())
 
 

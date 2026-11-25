@@ -6,11 +6,12 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from .. import permissions
 from ..config import settings
 from ..db import get_db
 from ..deps import client_ip, get_current_user
 from ..models import AuditLog, User
-from ..schemas import LoginIn, RefreshIn, TokenOut, UserOut
+from ..schemas import LoginIn, MeOut, RefreshIn, TokenOut, UserOut
 from ..security import create_token, decode_token, hash_password, verify_password
 from ..services import audit, passwords, totp
 
@@ -96,9 +97,12 @@ def refresh(body: RefreshIn, db: Session = Depends(get_db)):
     return _tokens(user)
 
 
-@router.get("/me", response_model=UserOut)
+@router.get("/me", response_model=MeOut)
 def me(user: User = Depends(get_current_user)):
-    return user
+    """A pessoa autenticada e o que ela pode fazer (a tela decide o que mostrar só por `permissions`)."""
+    out = MeOut.model_validate(user)
+    out.permissions, out.scope = permissions.allowed_actions(user), permissions.scope(user)
+    return out
 
 
 @router.post("/consent-photo", response_model=UserOut)
@@ -158,7 +162,7 @@ class SecondFactorIn(BaseModel):
 @router.get("/2fa")
 def two_factor_status(user: User = Depends(get_current_user)):
     return {"enabled": user.totp_enabled, "recovery_codes_left": len(user.totp_recovery or []),
-            "required": user.role in settings.require_2fa_role_set}
+            "required": permissions.requires_2fa(user)}
 
 
 @router.post("/2fa/setup")

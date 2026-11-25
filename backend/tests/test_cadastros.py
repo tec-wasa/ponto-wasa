@@ -68,7 +68,7 @@ def test_user_delete_only_without_history(client, world, db):
     r = client.delete(f"/users/{world['ids']['emp']}", headers=world["hr"])
     assert r.status_code == 409 and "Desativar" in r.json()["detail"]
     # gestor de outras pessoas
-    assert client.delete(f"/users/{world['ids']['mgr']}", headers=world["hr"]).status_code == 409
+    assert client.delete(f"/users/{world['ids']['mgr']}", headers=world["admin"]).status_code == 409
     # RH não exclui perfil privilegiado
     assert client.delete(f"/users/{world['ids']['hr']}", headers=world["hr"]).status_code == 409  # a si mesmo
 

@@ -11,6 +11,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from .. import permissions as perm
 from ..models import Absence, AuditLog, Company, Kiosk, Punch, User, utcnow
 from . import absences as absences_svc
 from . import hourbank, mirror, panel
@@ -82,12 +83,10 @@ def absences_report(db: Session, company: Company, actor: User, start: date, end
     if status and status not in STATUS_LABEL:
         raise ReportError("Situação inválida")
     zone = ZoneInfo(company.timezone)
-    q = (select(Absence, User).join(User, User.id == Absence.user_id)
-         .where(Absence.company_id == actor.company_id, Absence.start_date <= end, Absence.end_date >= start))
-    if actor.role == "manager":
-        q = q.where(User.manager_id == actor.id)
-    elif actor.role == "employee":
+    if not perm.can(actor, "team.view"):
         raise ReportError("Sem permissão", 403)
+    q = (select(Absence, User).join(User, User.id == Absence.user_id)
+         .where(perm.scope_condition(actor, include_self=False), Absence.start_date <= end, Absence.end_date >= start))
     if status:
         q = q.where(Absence.status == status)
     rows = []
@@ -151,7 +150,7 @@ def punches_report(db: Session, company: Company, actor: User, start: date, end:
 
 def kiosk_divergences(db: Session, company: Company, actor: User, start: date, end: date) -> dict:
     """Central: batidas fora do raio ou sem localização, falhas de identificação e aparelhos sem sinal."""
-    if actor.role not in ("hr", "admin", "auditor"):
+    if not perm.can(actor, "reports.company"):
         raise ReportError("Sem permissão", 403)
     lo, hi, zone = _window(company, start, end)
     kiosks = {k.id: k for k in db.execute(select(Kiosk).where(Kiosk.company_id == actor.company_id)).scalars()}

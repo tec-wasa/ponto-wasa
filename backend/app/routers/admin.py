@@ -8,8 +8,9 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from .. import permissions as perm
 from ..db import get_db
-from ..deps import MANAGEMENT_ROLES, client_ip, get_current_user, require_roles
+from ..deps import client_ip, get_current_user, require
 from ..models import (
     MANAGEMENT_FUNCS,
     Absence,
@@ -41,7 +42,7 @@ from ..services import kiosk as kiosk_svc
 
 router = APIRouter(tags=["cadastros"])
 
-PRIVILEGED = ("hr", "admin")
+NO_PURPOSE = "Quem não registra ponto precisa ter ao menos uma função de gestão (senão o cadastro não serve para nada)"
 
 
 def _resolve_roles(actor: User, roles: list[str] | None, role: str | None) -> list[str]:
@@ -55,8 +56,8 @@ def _resolve_roles(actor: User, roles: list[str] | None, role: str | None) -> li
         raise HTTPException(422, "Perfil inválido")
     if "auditor" in roles and len(roles) > 1:
         raise HTTPException(422, "O auditor (acesso só de leitura para a fiscalização) não acumula com outras funções")
-    if roles and actor.role != "admin":
-        raise HTTPException(403, "Somente o administrador atribui este perfil")
+    if roles and not perm.can(actor, "people.permissions"):
+        raise HTTPException(403, "Somente a Administração atribui funções de gestão")
     return sorted(roles, key=lambda r: (MANAGEMENT_FUNCS.index(r)))
 
 
@@ -77,7 +78,7 @@ def get_company(user: User = Depends(get_current_user), db: Session = Depends(ge
 
 @router.patch("/company", response_model=CompanyOut)
 def patch_company(
-    body: CompanyPatch, request: Request, actor: User = Depends(require_roles("admin")),
+    body: CompanyPatch, request: Request, actor: User = Depends(require("company.settings")),
     db: Session = Depends(get_db),
 ):
     company = db.get(Company, actor.company_id)
@@ -97,10 +98,12 @@ def patch_company(
 # --- Usuários ----------------------------------------------------------------
 @router.post("/users", response_model=UserOut, status_code=201)
 def create_user(
-    body: UserIn, request: Request, actor: User = Depends(require_roles(*MANAGEMENT_ROLES)),
+    body: UserIn, request: Request, actor: User = Depends(require("people.manage")),
     db: Session = Depends(get_db),
 ):
     roles = _resolve_roles(actor, body.roles, body.role)
+    if not body.tracks_time and not roles:
+        raise HTTPException(422, NO_PURPOSE)
     _same_company(db, actor, User, body.manager_id, "Gestor")
     _same_company(db, actor, Schedule, body.schedule_id, "Jornada")
     if db.execute(select(User.id).where(User.company_id == actor.company_id, User.cpf == body.cpf)).first():
@@ -126,28 +129,29 @@ def create_user(
 
 
 @router.get("/users", response_model=list[UserOut])
-def list_users(actor: User = Depends(require_roles("manager", "hr", "admin", "auditor")), db: Session = Depends(get_db)):
-    q = select(User).where(User.company_id == actor.company_id).order_by(User.name)
-    if actor.role == "manager":
-        q = q.where(User.manager_id == actor.id)
+def list_users(actor: User = Depends(require("people.list")), db: Session = Depends(get_db)):
+    q = select(User).where(perm.scope_condition(actor)).order_by(User.name)
     return db.execute(q).scalars().all()
 
 
 @router.patch("/users/{user_id}", response_model=UserOut)
 def patch_user(
     user_id: int, body: UserPatch, request: Request,
-    actor: User = Depends(require_roles(*MANAGEMENT_ROLES)), db: Session = Depends(get_db),
+    actor: User = Depends(require("people.manage")), db: Session = Depends(get_db),
 ):
     user = _same_company(db, actor, User, user_id, "Usuário")
     data = body.model_dump(exclude_unset=True)
-    if user.role in PRIVILEGED and actor.role != "admin":
-        raise HTTPException(403, "Somente o administrador altera este usuário")
+    if perm.is_privileged(user) and not perm.can(actor, "people.permissions"):
+        raise HTTPException(403, "Somente a Administração altera quem tem função de gestão")
     if "roles" in data or "role" in data:
         new_roles, legacy = data.pop("roles", None), data.pop("role", None)
         roles = _resolve_roles(actor, new_roles, legacy if new_roles is None else None)
-        if user.id == actor.id and "admin" not in roles:
+        if user.id == actor.id and perm.ADMIN not in roles:
             raise HTTPException(409, "Você não pode tirar de si mesmo a função de administrador")
         data["roles"], data["role"] = ",".join(roles), top_role(roles)
+    final_roles = data["roles"].split(",") if "roles" in data else user.role_list
+    if not data.get("tracks_time", user.tracks_time) and not [r for r in final_roles if r]:
+        raise HTTPException(422, NO_PURPOSE)
     if data.get("hour_bank_enabled") and not data.get("tracks_time", user.tracks_time):
         raise HTTPException(422, "Esta pessoa não registra ponto, então não tem banco de horas")
     if data.get("tracks_time") is False and user.hour_bank_enabled:
@@ -194,14 +198,14 @@ def patch_user(
 
 
 @router.delete("/users/{user_id}", status_code=204)
-def delete_user(user_id: int, request: Request, actor: User = Depends(require_roles(*MANAGEMENT_ROLES)), db: Session = Depends(get_db)):
+def delete_user(user_id: int, request: Request, actor: User = Depends(require("people.manage")), db: Session = Depends(get_db)):
     """Exclui o cadastro de quem NUNCA teve movimentação (cadastro por engano). Quem já tem marcações, ajustes, ausências ou banco de
     horas não pode ser apagado (são registros trabalhistas, imutáveis por desenho): use "Desativar", que mantém o histórico."""
     user = _same_company(db, actor, User, user_id, "Usuário")
     if user.id == actor.id:
         raise HTTPException(409, "Você não pode excluir o seu próprio cadastro")
-    if user.role in PRIVILEGED + ("auditor",) and actor.role != "admin":
-        raise HTTPException(403, "Somente o administrador exclui este usuário")
+    if perm.is_privileged(user) and not perm.can(actor, "people.permissions"):
+        raise HTTPException(403, "Somente a Administração exclui quem tem função de gestão")
     for model, label in ((Punch, "marcações"), (Adjustment, "ajustes"), (Absence, "ausências"), (HourBankEntry, "lançamentos de banco de horas"),
                          (PunchPhoto, "fotos")):
         if db.execute(select(model.id).where(model.user_id == user.id).limit(1)).first():
@@ -224,7 +228,7 @@ def delete_user(user_id: int, request: Request, actor: User = Depends(require_ro
 # --- Jornadas ----------------------------------------------------------------
 @router.post("/schedules", response_model=ScheduleOut, status_code=201)
 def create_schedule(
-    body: ScheduleIn, request: Request, actor: User = Depends(require_roles(*MANAGEMENT_ROLES)),
+    body: ScheduleIn, request: Request, actor: User = Depends(require("schedules.manage")),
     db: Session = Depends(get_db),
 ):
     if any(d < 0 or d > 6 for d in body.weekdays):
@@ -263,7 +267,7 @@ def _closed_month_with_punches(db: Session, company_id: int, user_ids: list[int]
 
 @router.patch("/schedules/{schedule_id}", response_model=ScheduleOut)
 def patch_schedule(
-    schedule_id: int, body: SchedulePatch, request: Request, actor: User = Depends(require_roles(*MANAGEMENT_ROLES)),
+    schedule_id: int, body: SchedulePatch, request: Request, actor: User = Depends(require("schedules.manage")),
     db: Session = Depends(get_db),
 ):
     """Edita a jornada. O nome é livre; as demais regras mudam o cálculo do Espelho (inclusive de dias já passados e ainda abertos):
@@ -298,7 +302,7 @@ def patch_schedule(
 
 
 @router.delete("/schedules/{schedule_id}", status_code=204)
-def delete_schedule(schedule_id: int, request: Request, actor: User = Depends(require_roles(*MANAGEMENT_ROLES)),
+def delete_schedule(schedule_id: int, request: Request, actor: User = Depends(require("schedules.manage")),
                     db: Session = Depends(get_db)):
     """Exclui uma jornada que ninguém usa. Em uso: troque a jornada das pessoas antes."""
     sched = db.get(Schedule, schedule_id)
@@ -324,7 +328,7 @@ class ImportIn(BaseModel):
 
 
 @router.get("/users/import/template")
-def import_template(actor: User = Depends(require_roles(*MANAGEMENT_ROLES))):
+def import_template(actor: User = Depends(require("people.manage"))):
     """Modelo do CSV (separador ';', UTF-8), com uma linha de exemplo."""
     return Response(csv_import.TEMPLATE.encode("utf-8-sig"), media_type="text/csv; charset=utf-8",
                     headers={"Content-Disposition": 'attachment; filename="modelo-colaboradores.csv"'})
@@ -333,13 +337,13 @@ def import_template(actor: User = Depends(require_roles(*MANAGEMENT_ROLES))):
 @router.post("/users/import")
 def import_users(
     body: ImportIn, request: Request, dry_run: bool = True,
-    actor: User = Depends(require_roles(*MANAGEMENT_ROLES)), db: Session = Depends(get_db),
+    actor: User = Depends(require("people.manage")), db: Session = Depends(get_db),
 ):
     """Importa colaboradores de um CSV. Por padrão só **valida** (`dry_run=true`); com `dry_run=false` grava tudo ou nada.
 
     Cada usuário nasce com uma senha temporária (mostrada só na resposta) e troca obrigatória no primeiro acesso.
     """
-    allowed = ("employee", "manager") if actor.role == "hr" else ("employee", "manager", "hr", "admin", "auditor")
+    allowed = ("employee", "manager", "hr", "admin", "auditor") if perm.can(actor, "people.permissions") else ("employee",)
     try:
         text = csv_import.decode_payload(body.content_base64)
     except ValueError as e:
@@ -385,14 +389,14 @@ def _target_for_recovery(db: Session, actor: User, user_id: int) -> User:
         raise HTTPException(404, "Usuário não encontrado")  # outra empresa: não revela que existe
     if user.id == actor.id:
         raise HTTPException(409, "Para a sua própria conta use Minha conta")
-    if user.role in PRIVILEGED + ("auditor",) and actor.role != "admin":
-        raise HTTPException(403, "Somente o administrador altera este usuário")
+    if perm.is_privileged(user) and not perm.can(actor, "people.permissions"):
+        raise HTTPException(403, "Somente a Administração altera quem tem função de gestão")
     return user
 
 
 @router.post("/users/{user_id}/reset-password")
 def reset_password(
-    user_id: int, request: Request, actor: User = Depends(require_roles(*MANAGEMENT_ROLES)), db: Session = Depends(get_db),
+    user_id: int, request: Request, actor: User = Depends(require("people.manage")), db: Session = Depends(get_db),
 ):
     """Gera uma senha temporária (mostrada só aqui), exige troca no próximo acesso e derruba as sessões abertas."""
     user = _target_for_recovery(db, actor, user_id)
@@ -406,7 +410,7 @@ def reset_password(
 
 @router.post("/users/{user_id}/reset-2fa")
 def reset_two_factor(
-    user_id: int, request: Request, actor: User = Depends(require_roles(*MANAGEMENT_ROLES)), db: Session = Depends(get_db),
+    user_id: int, request: Request, actor: User = Depends(require("people.manage")), db: Session = Depends(get_db),
 ):
     """Para quem perdeu o celular e os códigos de recuperação: remove o 2FA (a pessoa configura de novo)."""
     user = _target_for_recovery(db, actor, user_id)

@@ -150,7 +150,7 @@ def test_auditor_can_export_and_exports_are_audited(client, world):
         "name": "Aud Fiscal", "email": "aud@a.com", "password": "senha-forte-123", "cpf": make_cpf(500000002), "role": "auditor", "must_change_password": False})
     d = today_local()
     assert get_file(client, login(client, "aud@a.com"), "afd", d, d).status_code == 200
-    trail = client.get("/audit?entity=afd", headers=world["hr"]).json()
+    trail = client.get("/audit?entity=afd", headers=world["admin"]).json()
     assert trail and trail[0]["action"] == "export"
 
 

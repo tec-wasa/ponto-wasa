@@ -1,5 +1,11 @@
 export type Role = "employee" | "manager" | "hr" | "admin" | "auditor";
 
+export type Permission =
+  | "punch" | "company.settings" | "people.permissions" | "people.manage" | "people.list" | "schedules.manage"
+  | "kiosks.manage" | "kiosks.view" | "badges.manage" | "absences.register" | "hourbank.entries" | "approvals"
+  | "team.view" | "closing.manage" | "closing.view" | "fiscal.export" | "integrity.view" | "photos.view"
+  | "reports.company" | "audit.view";
+
 export interface User {
   id: number;
   name: string;
@@ -8,6 +14,8 @@ export interface User {
   role: Role;
   roles?: Role[]; // funções de gestão acumuláveis (admin, hr, manager; auditor sozinho)
   tracks_time?: boolean; // false: cadastro só de gestão, não registra ponto
+  permissions?: Permission[]; // só em /auth/me: o que a pessoa pode fazer (backend/app/permissions.py)
+  scope?: "self" | "team" | "company"; // alcance na gestão
   manager_id: number | null;
   schedule_id: number | null;
   active: boolean;

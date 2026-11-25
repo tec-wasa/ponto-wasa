@@ -83,7 +83,7 @@ def test_accepts_the_usual_excel_variations(client, world, text, encoding):
 def test_header_aliases_are_understood(client, world):
     text = (f"Nome;E-mail;CPF;Cargo/Função;E-mail do Gestor;Jornada;Perfil;Data de Admissão\n"
             f"Ana;ana.x@a.com;{cpf(710000020)};Analista;gestor@a.com;COMERCIAL;Gestor;2024-03-15\n")
-    body = post(client, world["hr"], text).json()
+    body = post(client, world["admin"], text).json()
     assert body["errors"] == [] and body["preview"][0]["role"] == "manager"  # jornada sem diferenciar maiúsculas
 
 
@@ -116,7 +116,7 @@ def test_manager_column_rules(client, world):
             f"Sub Um;sub1@a.com;{cpf(710000041)};;chefe@a.com;;;\n"  # o gestor está no próprio arquivo (e vem antes)
             f"Sub Dois;sub2@a.com;{cpf(710000042)};;ana@a.com;;;\n"  # ana é colaboradora, não gestora
             f"Sub Tres;sub3@a.com;{cpf(710000043)};;fantasma@a.com;;;\n")  # não existe
-    body = post(client, world["hr"], text).json()
+    body = post(client, world["admin"], text).json()
     assert {(e["line"], e["field"]) for e in body["errors"]} == {(4, "gestor"), (5, "gestor")}
 
 
@@ -144,7 +144,7 @@ def test_real_import_creates_users_with_temporary_passwords_and_records_the_arp(
             f"Chefe Novo;chefe.novo@a.com;{cpf(730000002)};Coordenador;;{sched.name};gestor;01/02/2023\n"
             f"Sem Nada;sem.nada@a.com;{cpf(730000003)};;;;;\n")
     arp_before = db.query(ArpEvent).filter(ArpEvent.record_type == "5").count()
-    r = post(client, world["hr"], text, dry_run=False)
+    r = post(client, world["admin"], text, dry_run=False)
     body = r.json()
     assert r.status_code == 200 and body["imported"] is True and body["created"] == 3 and body["dry_run"] is False
 
@@ -170,7 +170,7 @@ def test_real_import_creates_users_with_temporary_passwords_and_records_the_arp(
     trail = db.execute(select(AuditLog).where(AuditLog.action == "import")).scalar_one()
     assert trail.after == {"created": 3} and not any(p in str(trail.after) for p in creds.values())
     # importar de novo o mesmo arquivo falha por duplicidade e não cria nada
-    again = post(client, world["hr"], text, dry_run=False)
+    again = post(client, world["admin"], text, dry_run=False)
     assert again.status_code == 422 and again.json()["created"] == 0 and count_users(db) == len(users)
 
 

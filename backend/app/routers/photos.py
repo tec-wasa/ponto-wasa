@@ -6,13 +6,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..db import get_db
-from ..deps import client_ip, get_current_user, require_roles
+from ..deps import client_ip, get_current_user, require
 from ..models import Company, Punch, PunchPhoto, User
 from ..services import audit, photos
 from ..services.punching import month_is_closed, month_of
 
 router = APIRouter(tags=["fotos"])
-VIEWERS = ("hr", "admin")
 
 
 class PhotoIn(BaseModel):
@@ -54,7 +53,7 @@ def _photo_of(db: Session, actor: User, punch_id: int) -> PunchPhoto:
 
 @router.get("/punches/{punch_id}/photo")
 def view_photo(
-    punch_id: int, request: Request, actor: User = Depends(require_roles(*VIEWERS)), db: Session = Depends(get_db),
+    punch_id: int, request: Request, actor: User = Depends(require("photos.view")), db: Session = Depends(get_db),
 ):
     photo = _photo_of(db, actor, punch_id)
     try:
@@ -69,7 +68,7 @@ def view_photo(
 @router.get("/photos")
 def list_photos(
     user_id: int, month: str = Query(..., pattern=r"^\d{4}-(0[1-9]|1[0-2])$"),
-    actor: User = Depends(require_roles(*VIEWERS)), db: Session = Depends(get_db),
+    actor: User = Depends(require("photos.view")), db: Session = Depends(get_db),
 ):
     """Quais batidas de uma pessoa, em um mês, têm foto (sem as imagens)."""
     target = db.get(User, user_id)

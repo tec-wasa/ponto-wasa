@@ -6,17 +6,15 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from .. import permissions as perm
 from ..db import get_db
-from ..deps import MANAGEMENT_ROLES, can_view_user, client_ip, get_current_user, require_roles
+from ..deps import can_view_user, client_ip, get_current_user, require
 from ..models import Adjustment, Company, HourBankEntry, User
 from ..schemas import HourBankEntryIn, HourBankEntryOut
 from ..services import audit, hourbank, panel
 from ..services.punching import month_is_closed, month_of
 
 router = APIRouter(tags=["gestão"])
-
-APPROVERS = ("manager", "hr", "admin")
-
 
 def _utcnow() -> datetime:
     return datetime.now(UTC).replace(tzinfo=None)
@@ -27,7 +25,7 @@ def _utcnow() -> datetime:
 def dashboard(
     at: datetime | None = Query(None, description="Instante consultado (UTC); padrão: agora. Só passado ou presente."),
     bank: bool = Query(False, description="Inclui o saldo do banco de horas de quem o utiliza"),
-    actor: User = Depends(require_roles(*APPROVERS)), db: Session = Depends(get_db),
+    actor: User = Depends(require("team.view")), db: Session = Depends(get_db),
 ):
     """Situação da equipe (gestor) ou da empresa (RH/admin) em um instante."""
     company = db.get(Company, actor.company_id)
@@ -98,13 +96,11 @@ def hour_bank_statement(
 
 
 @router.get("/hour-bank/team")
-def hour_bank_team(actor: User = Depends(require_roles(*APPROVERS, "auditor")), db: Session = Depends(get_db)):
+def hour_bank_team(actor: User = Depends(require("team.view")), db: Session = Depends(get_db)):
     """Saldos de quem usa banco de horas (equipe do gestor; empresa toda para RH, admin e auditor)."""
     company = db.get(Company, actor.company_id)
-    q = select(User).where(User.company_id == actor.company_id, User.active.is_(True), User.hour_bank_enabled.is_(True),
-                                   User.tracks_time.is_(True))
-    if actor.role == "manager":
-        q = q.where(User.manager_id == actor.id)
+    q = select(User).where(perm.scope_condition(actor), User.active.is_(True), User.hour_bank_enabled.is_(True),
+                           User.tracks_time.is_(True))
     rows = []
     for u in db.execute(q.order_by(User.name)).scalars():
         s = hourbank.summary(db, company, u)
@@ -116,14 +112,14 @@ def hour_bank_team(actor: User = Depends(require_roles(*APPROVERS, "auditor")), 
 @router.post("/hour-bank/entries", response_model=HourBankEntryOut, status_code=201)
 def add_entry(
     body: HourBankEntryIn, request: Request,
-    actor: User = Depends(require_roles(*MANAGEMENT_ROLES)), db: Session = Depends(get_db),
+    actor: User = Depends(require("hourbank.entries")), db: Session = Depends(get_db),
 ):
     """Lançamento manual do RH: crédito ou compensação. Não se edita nem se apaga; corrige-se com o lançamento contrário."""
     company = db.get(Company, actor.company_id)
     target = db.get(User, body.user_id)
     if not target or target.company_id != actor.company_id:
         raise HTTPException(404, "Colaborador não encontrado")
-    if not target.hour_bank_enabled:
+    if not target.hour_bank_enabled or not target.tracks_time:
         raise HTTPException(409, "Este colaborador não usa banco de horas")
     if body.entry_date > hourbank.today_local(company):
         raise HTTPException(422, "A data do lançamento não pode ser futura")

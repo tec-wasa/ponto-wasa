@@ -4,6 +4,7 @@ from datetime import date, timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from .. import permissions as perm
 from ..models import Absence, Company, User
 from .mirror import ABSENCE_LABEL
 from .punching import month_is_closed
@@ -68,7 +69,7 @@ def can_view_detail(actor: User, absence: Absence) -> bool:
     """Motivo e anexo de dado sensível: o dono e o RH/admin. Gestor e demais só veem o fato e o período."""
     if absence.kind not in SENSITIVE_KINDS:
         return True
-    return actor.id == absence.user_id or actor.role in ("hr", "admin")
+    return actor.id == absence.user_id or perm.can(actor, "absences.register")
 
 
 def serialize(actor: User, a: Absence, owner_name: str | None = None) -> dict:

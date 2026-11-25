@@ -2,14 +2,12 @@ from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
-from .config import settings
+from . import permissions
 from .db import get_db
 from .models import User
 from .security import decode_token
 
 _bearer = HTTPBearer(auto_error=False)
-
-MANAGEMENT_ROLES = ("hr", "admin")
 
 # Enquanto a conta tem uma pendência de segurança, só estas rotas funcionam (o suficiente para resolvê-la).
 ALLOWED_WHEN_RESTRICTED = {
@@ -24,7 +22,7 @@ RESTRICTION_MESSAGE = {
 def restriction_of(user: User) -> str | None:
     if user.must_change_password:
         return "password_change_required"
-    if user.role in settings.require_2fa_role_set and not user.totp_enabled:
+    if permissions.requires_2fa(user) and not user.totp_enabled:
         return "two_factor_required"
     return None
 
@@ -45,13 +43,20 @@ def get_current_user(
     return user
 
 
-def require_roles(*roles: str):
+def require(action: str):
+    """Dependência: a pessoa autenticada precisa ter a permissão `action` (ver permissions.ACTIONS)."""
     def checker(user: User = Depends(get_current_user)) -> User:
-        if user.role not in roles:
+        if not permissions.can(user, action):
             raise HTTPException(403, "Sem permissão para esta operação")
         return user
 
     return checker
+
+
+def require_punch(user: User) -> None:
+    """Rotas do "Meu ponto": recusa quem não registra ponto (cadastro só de gestão)."""
+    if not permissions.can(user, "punch"):
+        raise HTTPException(403, "Este cadastro é só de gestão: não registra ponto")
 
 
 def client_ip(request: Request) -> str | None:
@@ -59,9 +64,20 @@ def client_ip(request: Request) -> str | None:
 
 
 def can_view_user(db: Session, actor: User, target: User) -> bool:
-    """Colaborador vê a si mesmo; gestor vê sua equipe; RH/admin/auditor veem a empresa."""
-    if target.company_id != actor.company_id:
+    """A própria pessoa; a equipe, para o gestor; a empresa, para RH, administração e auditor."""
+    return permissions.in_scope(actor, target)
+
+
+def authorize_decision(db: Session, actor: User, owner: User, note: str | None, what: str) -> bool:
+    """Quem pode aprovar ou rejeitar o pedido (ajuste/ausência) de `owner`. Devolve True quando é autoaprovação: permitida só à
+    Administração, quando ninguém mais poderia decidir, e com justificativa (registrada em destaque na auditoria)."""
+    if permissions.can_approve(actor, owner):
         return False
-    if actor.id == target.id or actor.role in (*MANAGEMENT_ROLES, "auditor"):
+    if permissions.self_approval_allowed(db, actor, owner):
+        if not note or len(note.strip()) < 10:
+            raise HTTPException(422, f"Você é a única pessoa que pode decidir este {what}. Para decidir o seu próprio pedido, escreva "
+                                     "uma justificativa (ao menos 10 caracteres); ela fica registrada em destaque na auditoria.")
         return True
-    return actor.role == "manager" and target.manager_id == actor.id
+    if actor.id == owner.id:
+        raise HTTPException(403, f"Não é permitido decidir o próprio {what}")
+    raise HTTPException(403, f"Sem permissão para decidir este {what}")
