@@ -153,7 +153,8 @@ def create_user(
         # sem acesso ao app: senha aleatória que ninguém conhece (o login também é recusado por app_access)
         password_hash=hash_password(body.password if body.app_access else secrets.token_urlsafe(32)),
         role=top_role(roles), roles=",".join(roles), tracks_time=body.tracks_time, app_access=body.app_access,
-        punch_policy="both" if body.app_access else "kiosk",
+        punch_policy=body.punch_policy if body.app_access else "kiosk",
+        hour_bank_enabled=body.hour_bank_enabled and body.tracks_time,
         manager_id=body.manager_id, schedule_id=body.schedule_id, admitted_at=body.admitted_at,
         job_title=body.job_title, must_change_password=body.must_change_password and body.app_access,
     )
@@ -164,7 +165,11 @@ def create_user(
     except IntegrityError:
         db.rollback()
         raise HTTPException(409, "E-mail já cadastrado") from None
-    arp.record_employee(db, db.get(Company, actor.company_id), "I", user, actor)  # tipo 5: inclusão
+    company = db.get(Company, actor.company_id)
+    if user.hour_bank_enabled:
+        user.hour_bank_start = datetime.now(ZoneInfo(company.timezone)).date()
+    if arp.in_rep(user):
+        arp.record_employee(db, company, "I", user, actor)  # tipo 5: inclusão
     audit.log(db, actor, "create", "user", user.id, after={"email": user.email, "roles": user.roles, "tracks_time": user.tracks_time},
               ip=client_ip(request))
     db.commit()
@@ -227,6 +232,7 @@ def patch_user(
                 raise HTTPException(409, f"Não é possível trocar a jornada: o mês {month} está fechado e tem marcações desta pessoa. "
                                          "Reabra o mês (RH ou administrador) antes de trocar.")
     before = {k: getattr(user, k) for k in data}
+    was_in_rep = arp.in_rep(user)
     for k, v in data.items():
         setattr(user, k, v)
     if before.get("app_access") and data.get("app_access") is False:
@@ -240,10 +246,11 @@ def patch_user(
     if data.get("hour_bank_enabled") and not user.hour_bank_start:
         user.hour_bank_start = datetime.now(ZoneInfo(company.timezone)).date()  # o saldo passa a contar a partir de hoje
         data["hour_bank_start"] = user.hour_bank_start
-    if "active" in data and before["active"] != data["active"]:
-        arp.record_employee(db, company, "I" if data["active"] else "E", user, actor)  # tipo 5: inclusão/exclusão
-    elif ("name" in data and before["name"] != data["name"]) or ("cpf" in data and before["cpf"] != data["cpf"]):
-        arp.record_employee(db, company, "A", user, actor)  # tipo 5: alteração
+    # tipo 5: entra/sai do REP-P quando passa a (ou deixa de) estar ativa e registrando ponto; alteração de nome/CPF de quem consta
+    if arp.in_rep(user) != was_in_rep:
+        arp.record_employee(db, company, "I" if arp.in_rep(user) else "E", user, actor)
+    elif arp.in_rep(user) and (("name" in data and before["name"] != data["name"]) or ("cpf" in data and before["cpf"] != data["cpf"])):
+        arp.record_employee(db, company, "A", user, actor)
     audit.log(db, actor, "update", "user", user.id, before=before, after=data, ip=client_ip(request))
     db.commit()
     return user
@@ -266,7 +273,8 @@ def delete_user(user_id: int, request: Request, actor: User = Depends(require("p
         raise HTTPException(409, "Esta pessoa é gestora de outras. Troque o gestor delas antes de excluir.")
     snapshot = {"name": user.name, "email": user.email, "role": user.role}
     db.query(KioskTicket).filter(KioskTicket.user_id == user.id).delete()
-    arp.record_employee(db, db.get(Company, actor.company_id), "E", user, actor)  # tipo 5: exclusão
+    if arp.in_rep(user):  # quem já foi desativado (ou não registra ponto) já está fora do REP-P
+        arp.record_employee(db, db.get(Company, actor.company_id), "E", user, actor)  # tipo 5: exclusão
     audit.log(db, actor, "delete", "user", user.id, before=snapshot, ip=client_ip(request))
     db.delete(user)
     try:

@@ -120,3 +120,12 @@ def test_manager_must_have_management_function(client, world):
     assert r.status_code == 422 and "Gestor" in r.json()["detail"]
     assert client.patch(f"/users/{ids['other']}", headers=adm, json={"manager_id": ids["mgr"]}).status_code == 200
     assert client.patch(f"/users/{ids['mgr']}", headers=adm, json={"manager_id": ids["mgr"]}).status_code == 422
+
+
+def test_create_with_hour_bank_and_kiosk_policy(client, world):
+    r = client.post("/users", headers=world["admin"], json={
+        "name": "Lia Banco", "email": "lia@a.com", "password": "senha-forte-123", "cpf": make_cpf(400000003),
+        "hour_bank_enabled": True, "punch_policy": "kiosk"})
+    assert r.status_code == 201, r.text
+    u = r.json()
+    assert u["hour_bank_enabled"] is True and u["hour_bank_start"] and u["punch_policy"] == "kiosk"

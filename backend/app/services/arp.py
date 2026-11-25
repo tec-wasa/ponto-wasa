@@ -84,6 +84,12 @@ def record_employer(db: Session, company: Company, actor: User | None) -> ArpEve
     })
 
 
+def in_rep(user: User) -> bool:
+    """A pessoa consta como empregado no REP-P: está ativa e registra ponto. Cadastros só de gestão (que não registram ponto)
+    não são empregados sob controle de jornada e não geram registro tipo 5."""
+    return bool(user.active and user.tracks_time)
+
+
 def record_employee(db: Session, company: Company, op: str, user: User, actor: User | None) -> ArpEvent:
     """Tipo 5: inclusão (I), alteração (A) ou exclusão (E) de empregado."""
     assert op in ("I", "A", "E")

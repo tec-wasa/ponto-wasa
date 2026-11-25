@@ -34,6 +34,8 @@ class UserIn(BaseModel):
     cpf: str  # obrigatório: identifica o trabalhador nos registros do REP-P
     password: str | None = Field(None, min_length=8)  # senha inicial (temporária) de quem entra no aplicativo
     app_access: bool = True  # False: só bate ponto na Central, sem login
+    hour_bank_enabled: bool = False  # o saldo conta a partir do dia do cadastro
+    punch_policy: Literal["both", "kiosk"] = "both"
     role: str = "employee"  # legado: um só perfil; prefira `roles`
     roles: list[str] | None = None  # funções de gestão acumuláveis: admin, hr, manager (ou só auditor)
     tracks_time: bool = True  # False: só gere, não bate ponto (sem espelho, banco de horas, ajustes)

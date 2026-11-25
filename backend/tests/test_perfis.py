@@ -49,3 +49,25 @@ def test_management_only_account_does_not_punch(client, world):
     dash = client.get("/dashboard", headers=world["admin"])
     assert dash.status_code == 200 and u["id"] not in [p["user_id"] for p in dash.json()["people"]]
     assert client.get("/hour-bank/team", headers=world["admin"]).status_code == 200
+
+
+def test_rep_type5_only_for_people_who_track_time(client, world, db):
+    from sqlalchemy import select
+
+    from app.models import ArpEvent
+
+    def ops(cpf):
+        db.expire_all()
+        return [e.data["op"] for e in db.execute(select(ArpEvent).where(ArpEvent.record_type == "5").order_by(ArpEvent.nsr)).scalars()
+                if e.data["cpf"] == cpf]
+
+    u = new_user(client, world, n="sogestao", roles=["admin"], tracks_time=False)
+    assert ops(u["cpf"]) == []  # cadastro só de gestão não entra no REP-P
+    client.patch(f"/users/{u['id']}", headers=world["admin"], json={"name": "Outro Nome"})
+    assert ops(u["cpf"]) == []
+    client.patch(f"/users/{u['id']}", headers=world["admin"], json={"tracks_time": True})
+    assert ops(u["cpf"]) == ["I"]  # passou a registrar ponto: inclusão
+    client.patch(f"/users/{u['id']}", headers=world["admin"], json={"active": False})
+    assert ops(u["cpf"]) == ["I", "E"]
+    client.patch(f"/users/{u['id']}", headers=world["admin"], json={"tracks_time": False, "active": True})
+    assert ops(u["cpf"]) == ["I", "E"]  # voltou ativa, mas só de gestão: continua fora
