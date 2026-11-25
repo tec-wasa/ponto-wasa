@@ -126,4 +126,31 @@ def espelho_pdf(e: dict) -> bytes:
         "Saídas de turnos que atravessam a meia-noite aparecem no dia em que o turno começou, com a indicação (dia seguinte). "
         "Duração: tempo trabalhado considerando a hora noturna reduzida (22h às 5h; 52 min 30 s = 1 hora). "
         "Saldo: diferença para a jornada contratual, já aplicada a tolerância legal."), **NEXT_LINE)
+
+    # Ciência do empregado e do empregador (assinatura no fim do mês). Fica inteira na mesma página.
+    if pdf.get_y() > pdf.h - pdf.b_margin - 42:
+        pdf.add_page()
+    pdf.ln(6)
+    pdf.set_font("Helvetica", "", 8.5)
+    pdf.multi_cell(0, 4.5, latin1_safe(
+        f"Declaro que conferi as marcações e os totais deste espelho, referentes ao período de {_br_date(e['period']['start'])} a "
+        f"{_br_date(e['period']['end'])}. Divergências devem ser comunicadas por escrito ao empregador."), **NEXT_LINE)
+    pdf.ln(4)
+    pdf.cell(0, 5, latin1_safe("Local e data: ______________________________, ____/____/________"), **NEXT_LINE)
+    pdf.ln(12)
+    col = (pdf.w - pdf.l_margin - pdf.r_margin - 20) / 2
+    x0 = pdf.l_margin
+    y = pdf.get_y()
+    pdf.line(x0, y, x0 + col, y)
+    pdf.line(x0 + col + 20, y, x0 + 2 * col + 20, y)
+    pdf.set_font("Helvetica", "B", 8.5)
+    pdf.set_xy(x0, y + 1)
+    pdf.cell(col, 4.5, latin1_safe(w["name"]), align="C")
+    pdf.set_xy(x0 + col + 20, y + 1)
+    pdf.cell(col, 4.5, latin1_safe(emp["name"]), align="C", **NEXT_LINE)
+    pdf.set_font("Helvetica", "", 8)
+    pdf.set_x(x0)
+    pdf.cell(col, 4, latin1_safe(f"Empregado(a) - CPF {_fmt_cpf(w['cpf'])}"), align="C")
+    pdf.set_xy(x0 + col + 20, pdf.get_y())
+    pdf.cell(col, 4, latin1_safe(f"Empregador - CNPJ/CPF {emp['id']}"), align="C", **NEXT_LINE)
     return bytes(pdf.output())
