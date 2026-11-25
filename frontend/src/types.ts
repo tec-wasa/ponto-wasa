@@ -126,7 +126,7 @@ export interface Adjustment {
   punch_kind: string | null;
   target_punch_id: number | null;
   reason: string;
-  status: "pending" | "approved" | "rejected";
+  status: "pending" | "approved" | "rejected" | "revoked";
   decided_by: number | null;
   decision_note: string | null;
   user_name?: string | null;

@@ -324,9 +324,8 @@ def test_disregard_punch_removes_it_from_mirror_but_keeps_it_in_the_arp(client, 
         "kind": "desconsiderar", "target_punch_id": p.id, "reason": "Marcação feita por engano"}).json()
     client.post(f"/adjustments/{adj['id']}/decision", headers=world["mgr"], json={"approve": True})
     again = client.post("/adjustments", headers=world["emp"], json={
-        "kind": "desconsiderar", "target_punch_id": p.id, "reason": "Marcação feita por engano"}).json()
-    r = client.post(f"/adjustments/{again['id']}/decision", headers=world["mgr"], json={"approve": True})
-    assert r.status_code == 409
+        "kind": "desconsiderar", "target_punch_id": p.id, "reason": "Marcação feita por engano"})
+    assert again.status_code == 409  # já desconsiderada: nem vira pedido
     month = when.strftime("%Y-%m")
     days = client.get(f"/mirror?month={month}", headers=world["emp"]).json()["days"]
     assert all(not d["punches"] for d in days if d["date"] == (when - timedelta(hours=3)).strftime("%Y-%m-%d"))

@@ -5,7 +5,7 @@ import { KIND_LABEL, fmtDateTimeMin, localToUtcIso, todayLocal } from "../util";
 
 /** Peças de "ajuste de marcação": o pedido (Meu ponto > Solicitações) e a descrição usada também em Aprovações. */
 
-export const ADJ_STATUS = { pending: "Pendente", approved: "Aprovado", rejected: "Rejeitado" } as const;
+export const ADJ_STATUS: Record<string, string> = { pending: "Pendente", approved: "Aprovado", rejected: "Rejeitado", revoked: "Desfeito" };
 const REASONS = ["Esqueci de bater o ponto", "Bati por engano", "Sem internet no momento", "Problema no aplicativo"];
 
 export function describeAdjustment(a: Adjustment, tz: string, punches: Punch[] = []): string {

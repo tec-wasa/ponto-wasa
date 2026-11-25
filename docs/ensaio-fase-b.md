@@ -81,6 +81,7 @@ Aparelhos: pelo menos um Android (Chrome) e, se houver, um iPhone (Safari).
 | G1 | Gestão > Aprovações: aprovar o ajuste da Ana (A8) e rejeitar o atestado (A9) com motivo | Some da caixa; Ana vê "Aprovado"/"Rejeitado" com a resposta |
 | G2 | Espelhos > Ana | O ajuste aprovado aparece no dia |
 | G3 | Painel | Só Ana e Zeca, com a situação de agora |
+| G3b | Gestão > Tratamento > Ana: num dia de falta, incluir entrada e saída; desconsiderar uma batida; desfazer uma das correções | O dia muda na hora (falta vira regular); cada correção mostra quem fez e o motivo; Ana vê as correções em Solicitações |
 | G4 | Meu ponto: Gil registra o ponto e pede um ajuste | Funciona como para a Ana; o pedido **não** aparece na caixa dele (vai para RH/Administração) |
 
 ## 6. RH (Rita, no computador)
@@ -88,6 +89,7 @@ Aparelhos: pelo menos um Android (Chrome) e, se houver, um iPhone (Safari).
 | # | Teste | Esperado |
 | --- | --- | --- |
 | R1 | Aprovações: aprovar o ajuste do Gil (G4) | Aprovado |
+| R1b | Tratamento > Zeca: "Justificar o dia" com abono de um dia de falta | O dia vira "Justificada" |
 | R2 | Ausências > Registrar ausência: férias da Ana (próxima semana) | Entra já aprovada; aparece no espelho dela |
 | R3 | Banco de horas > Ana > Fazer um lançamento (crédito 1h) | Saldo muda; "Lançamento" no extrato |
 | R4 | Cadastros > Pessoas: editar a Ana (cargo, admissão, gestor) | Salva; o gestor só pode ser quem tem função de gestão |

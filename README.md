@@ -120,6 +120,10 @@ O aplicativo tem duas áreas: **Meu ponto** (Ponto, Registros, Solicitações, B
 
 Autoaprovação: a Administração só decide o próprio pedido quando ninguém mais na empresa poderia decidi-lo, com justificativa obrigatória (fica como `self_approve` na auditoria).
 
+## Tratamento do ponto (Gestão > Tratamento)
+
+Quem decide os pedidos de uma pessoa (gestor da equipe, RH, Administração) pode corrigir o mês dela por conta própria, sem esperar um pedido: incluir uma marcação esquecida, desconsiderar uma marcação errada e (RH/Administração) justificar o dia. A marcação original nunca é alterada: cada correção é um tratamento já aprovado, com motivo e autor, que entra no espelho e no AEJ, fica na auditoria (`treat`) e pode ser desfeito enquanto o mês estiver aberto (`revoke`). Mês fechado: reabra antes. A pessoa vê as correções em Solicitações e no espelho.
+
 ## Login com Google
 
 "Entrar com Google" aparece na tela de login quando `GOOGLE_CLIENT_ID` está no `.env` (ID do cliente OAuth do tipo Aplicativo da Web, criado no Google Cloud Console com a origem `https://<DOMAIN>` autorizada; não é segredo). Não há cadastro aberto: entra quem a empresa cadastrou com o mesmo e-mail, ou quem vinculou outra conta Google em Minha conta. Na primeira entrada a conta Google fica vinculada ao cadastro. Quem entra pelo Google não tem senha temporária a trocar nem 2FA do app (vale o da conta Google). Em Empresa > Configurações a Administração pode desligar o login por senha (só depois de vincular a própria conta Google). A sessão usa um cookie HttpOnly para a renovação; o aparelho guarda só o token de acesso. As páginas `/privacidade` e `/termos` (exigidas pelo Google) usam `DEV_NAME` e `DEV_EMAIL` do `.env` e precisam de revisão jurídica antes da produção.

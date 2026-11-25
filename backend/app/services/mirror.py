@@ -71,3 +71,22 @@ def month_days(db: Session, user: User, company: Company, year: int, month: int)
     first, last = date(year, month, 1), date(year + (month == 12), month % 12 + 1, 1) - timedelta(days=1)
     return compute_month(valid, schedule_rule(sched), company.timezone, year, month, today, start=admission,
                          justified=justifications(db, user, first, last))
+
+
+def summarize(days: list[DayResult]) -> dict:
+    """Totais do mês e os dias no formato da API (Espelho e Tratamento)."""
+    return {
+        "totals": {
+            "worked_minutes": sum(d.worked for d in days),
+            "expected_minutes": sum(d.expected for d in days if d.status not in ("futuro", "hoje", "anterior")),
+            "balance_minutes": sum(d.balance for d in days),
+            "absences": sum(1 for d in days if d.status == "falta"),
+            "justified_days": sum(1 for d in days if d.status == "justificada"),
+            "incomplete_days": sum(1 for d in days if d.status == "incompleto"),
+        },
+        "days": [
+            {"date": d.date.isoformat(), "expected": d.expected, "worked": d.worked, "balance": d.balance,
+             "status": d.status, "punches": d.punches, "warnings": d.warnings, "justification": d.justification}
+            for d in days
+        ],
+    }

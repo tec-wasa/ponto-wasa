@@ -16,6 +16,7 @@ import Punch from "./pages/Punch";
 import Reports from "./pages/Reports";
 import Team from "./pages/Team";
 import TeamAbsences from "./pages/TeamAbsences";
+import Treatment from "./pages/Treatment";
 import { runSync } from "./sync";
 import { applyTheme, currentTheme } from "./theme";
 import type { Permission, User } from "./types";
@@ -70,6 +71,7 @@ export function areaItems(can: (p: Permission) => boolean) {
     ...(team ? [{ to: "/gestao", label: "Painel", hint: "Quem está trabalhando agora", icon: <IconPeople />, end: true }] : []),
     ...(can("approvals") ? [{ to: "/gestao/aprovacoes", label: "Aprovações", hint: "Ajustes e ausências aguardando decisão", icon: <IconClock /> }] : []),
     ...(team ? [{ to: "/gestao/espelhos", label: "Espelhos", hint: "Espelho de ponto de cada pessoa", icon: <IconList /> }] : []),
+    ...(can("approvals") ? [{ to: "/gestao/tratamento", label: "Tratamento", hint: "Corrigir o ponto do mês de cada pessoa" }] : []),
     ...(team ? [{ to: "/gestao/banco", label: "Banco de horas", hint: "Saldos e lançamentos" }] : []),
     ...(team ? [{ to: "/gestao/ausencias", label: "Ausências", hint: "Atestados, férias, licenças e afastamentos" }] : []),
     ...(team ? [{ to: "/gestao/relatorios", label: "Relatórios", hint: "Fechamento mensal, banco de horas, ausências", icon: <IconBars /> }] : []),
@@ -184,6 +186,7 @@ export default function App() {
           {can("team.view") && <Route path="/gestao" element={<Team />} />}
           {can("approvals") && <Route path="/gestao/aprovacoes" element={<Approvals />} />}
           {can("team.view") && <Route path="/gestao/espelhos" element={<Mirror mode="team" />} />}
+          {can("approvals") && <Route path="/gestao/tratamento" element={<Treatment />} />}
           {can("team.view") && <Route path="/gestao/banco" element={<TeamBank />} />}
           {can("team.view") && <Route path="/gestao/ausencias" element={<TeamAbsences />} />}
           {can("team.view") && <Route path="/gestao/relatorios" element={<Reports />} />}

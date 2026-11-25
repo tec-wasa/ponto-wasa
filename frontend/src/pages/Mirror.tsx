@@ -139,6 +139,9 @@ export default function Mirror({ mode = "self" }: { mode?: "self" | "team" }) {
         </label>
       )}
       {team && !target && people.length === 0 && <p className="card muted">Ninguém para acompanhar ainda.</p>}
+      {team && target && can("approvals") && (
+        <p className="small" style={{ margin: "0 0 12px" }}><Link to={`/gestao/tratamento?user=${target}&mes=${month}`}>Corrigir este mês em Tratamento →</Link></p>
+      )}
 
       {error && <p className="alert error" role="alert">{error}</p>}
       {loading && !data && <p className="muted" role="status">Carregando…</p>}

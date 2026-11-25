@@ -16,7 +16,7 @@ from ..schemas import PunchIn, PunchOut, ReceiptOut
 from ..services import audit, clock, pdfsign, signing
 from ..services import pdf as pdf_service
 from ..services.espelho import build_espelho
-from ..services.mirror import month_days
+from ..services.mirror import month_days, summarize
 from ..services.punching import KIND_LABEL, PunchError, _crosses, day_closed, has_break, next_kind, register_punch, verify_chain
 
 router = APIRouter(tags=["ponto"])
@@ -197,22 +197,7 @@ def mirror(
         raise HTTPException(404, "Colaborador não encontrado")
 
     days = month_days(db, target, db.get(Company, target.company_id), int(month[:4]), int(month[5:]))
-    return {
-        "user_id": target.id, "month": month,
-        "totals": {
-            "worked_minutes": sum(d.worked for d in days),
-            "expected_minutes": sum(d.expected for d in days if d.status not in ("futuro", "hoje", "anterior")),
-            "balance_minutes": sum(d.balance for d in days),
-            "absences": sum(1 for d in days if d.status == "falta"),
-            "justified_days": sum(1 for d in days if d.status == "justificada"),
-            "incomplete_days": sum(1 for d in days if d.status == "incompleto"),
-        },
-        "days": [
-            {"date": d.date.isoformat(), "expected": d.expected, "worked": d.worked, "balance": d.balance,
-             "status": d.status, "punches": d.punches, "warnings": d.warnings, "justification": d.justification}
-            for d in days
-        ],
-    }
+    return {"user_id": target.id, "month": month, **summarize(days)}
 
 
 @router.get("/mirror/official.pdf")

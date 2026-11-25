@@ -1,6 +1,6 @@
 """Ajustes com aprovação, fechamento mensal e consulta da trilha de auditoria."""
 import re
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -10,11 +10,12 @@ from sqlalchemy.orm import Session
 from .. import permissions as perm
 from ..db import get_db
 from ..deps import authorize_decision, client_ip, get_current_user, require, require_punch
-from ..models import Absence, Adjustment, AuditLog, Closing, Company, Punch, User
+from ..models import Absence, Adjustment, AuditLog, Closing, Company, Kiosk, Punch, User
 from ..schemas import AdjustmentIn, AdjustmentOut, DecisionIn
 from ..services import absences as absence_svc
 from ..services import audit, photos
-from ..services.punching import ALL_KINDS, month_is_closed, month_of
+from ..services.mirror import ABSENCE_LABEL, month_days, summarize
+from ..services.punching import ALL_KINDS, KIND_LABEL, month_is_closed, month_of
 
 router = APIRouter(tags=["fluxo"])
 
@@ -64,14 +65,22 @@ def create_adjustment(
     if month_is_closed(db, company.id, month):
         raise HTTPException(409, "O mês do ajuste está fechado")
 
+    # Tratamento direto: quem pode decidir os pedidos desta pessoa corrige o ponto dela por conta própria (Gestão > Tratamento).
+    # A marcação original nunca muda; o ajuste nasce aprovado, com o motivo, e entra no AEJ como qualquer tratamento.
+    direct = target_user.id != actor.id and perm.can_approve(actor, target_user)
+    if body.kind == "desconsiderar" and _voided_by(db, body.target_punch_id):
+        raise HTTPException(409, "Esta marcação já está desconsiderada")
     adj = Adjustment(
         company_id=company.id, user_id=target_user.id, kind=body.kind, requested_at=body.requested_at,
         punch_kind=body.punch_kind, target_punch_id=body.target_punch_id, reason=body.reason,
         attachment_name=body.attachment_name,
     )
+    if direct:
+        adj.status, adj.decided_by, adj.decided_at = "approved", actor.id, _now()
     db.add(adj)
     db.flush()
-    audit.log(db, actor, "create", "adjustment", adj.id, after={"kind": adj.kind, "user_id": adj.user_id},
+    audit.log(db, actor, "treat" if direct else "create", "adjustment", adj.id,
+              after={"kind": adj.kind, "user_id": adj.user_id, "status": adj.status, "reason": adj.reason if direct else None},
               ip=client_ip(request))
     db.commit()
     return adj
@@ -143,6 +152,104 @@ def decide(
               ip=client_ip(request))
     db.commit()
     return adj
+
+
+def _voided_by(db: Session, punch_id: int | None) -> Adjustment | None:
+    if not punch_id:
+        return None
+    return db.execute(select(Adjustment).where(
+        Adjustment.kind == "desconsiderar", Adjustment.status == "approved", Adjustment.target_punch_id == punch_id)).scalars().first()
+
+
+@router.post("/adjustments/{adj_id}/revoke", response_model=AdjustmentOut)
+def revoke_adjustment(adj_id: int, request: Request, actor: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Desfaz um tratamento aprovado (inclusão ou desconsideração) enquanto o mês estiver aberto. Fica na auditoria."""
+    adj = db.get(Adjustment, adj_id)
+    if not adj or adj.company_id != actor.company_id:
+        raise HTTPException(404, "Ajuste não encontrado")
+    owner = db.get(User, adj.user_id)
+    if not perm.can_approve(actor, owner):
+        raise HTTPException(403, "Sem permissão para desfazer este ajuste")
+    if adj.status != "approved":
+        raise HTTPException(409, "Só um ajuste aprovado pode ser desfeito")
+    company = db.get(Company, adj.company_id)
+    if month_is_closed(db, company.id, _adjustment_month(db, company, adj)):
+        raise HTTPException(409, "O mês do ajuste está fechado")
+    adj.status = "revoked"
+    audit.log(db, actor, "revoke", "adjustment", adj.id, before={"status": "approved"}, after={"status": "revoked"}, ip=client_ip(request))
+    db.commit()
+    return adj
+
+
+# --- Tratamento mensal ---------------------------------------------------------
+@router.get("/treatment")
+def treatment(month: str, user_id: int, actor: User = Depends(require("team.view")), db: Session = Depends(get_db)):
+    """O mês de uma pessoa, dia a dia, para a gestão tratar o ponto: cada marcação original (e se está desconsiderada),
+    as inclusões, os pedidos pendentes e as ausências, além do cálculo do espelho."""
+    _valid_month(month)
+    target = db.get(User, user_id)
+    if not target or target.id == actor.id or not perm.in_scope(actor, target) or not target.tracks_time:
+        raise HTTPException(404, "Colaborador não encontrado")
+    company = db.get(Company, target.company_id)
+    year, mon = int(month[:4]), int(month[5:])
+    zone = ZoneInfo(company.timezone)
+    lo = datetime(year, mon, 1) - timedelta(days=1)
+    hi = datetime(year + (mon == 12), mon % 12 + 1, 1) + timedelta(days=1)
+
+    def local_day(at: datetime) -> str:
+        return at.replace(tzinfo=UTC).astimezone(zone).date().isoformat()
+
+    adjs = db.execute(select(Adjustment).where(Adjustment.user_id == target.id)).scalars().all()
+    voids = {a.target_punch_id: a for a in adjs if a.kind == "desconsiderar" and a.status == "approved"}
+    names = {u.id: u.name for u in db.execute(select(User).where(User.company_id == company.id)).scalars()}
+    kiosks = {k.id: k.name for k in db.execute(select(Kiosk).where(Kiosk.company_id == company.id)).scalars()}
+    punches = db.execute(select(Punch).where(Punch.user_id == target.id, Punch.occurred_at >= lo, Punch.occurred_at < hi)
+                         .order_by(Punch.occurred_at)).scalars().all()
+    by_id = {p.id: p for p in punches}
+    marks: dict[str, list] = {}
+    for p in punches:
+        v = voids.get(p.id)
+        marks.setdefault(local_day(p.occurred_at), []).append({
+            "type": "original", "punch_id": p.id, "nsr": p.nsr, "at": p.occurred_at, "kind": p.kind, "label": KIND_LABEL[p.kind],
+            "origin": f"Central {kiosks.get(p.kiosk_id, '')}".strip() if p.kiosk_id else "Aplicativo", "offline": p.offline,
+            "voided": v is not None, "adjustment_id": v.id if v else None, "note": v.reason if v else None,
+            "by": names.get(v.decided_by) if v else None})
+    pending: dict[str, list] = {}
+    for a in adjs:
+        at = a.requested_at if a.kind == "incluir" else (by_id[a.target_punch_id].occurred_at if a.target_punch_id in by_id else None)
+        if at is None or not (lo <= at < hi):
+            continue
+        if a.kind == "incluir" and a.status == "approved":
+            marks.setdefault(local_day(at), []).append({
+                "type": "inclusao", "adjustment_id": a.id, "at": at, "kind": a.punch_kind, "label": KIND_LABEL.get(a.punch_kind, ""),
+                "note": a.reason, "by": names.get(a.decided_by)})
+        elif a.status == "pending":
+            pending.setdefault(local_day(at), []).append({
+                "adjustment_id": a.id, "kind": a.kind, "at": at, "label": KIND_LABEL.get(a.punch_kind or (by_id[a.target_punch_id].kind
+                                                                                               if a.target_punch_id in by_id else ""), ""),
+                "reason": a.reason})
+    for day in marks.values():
+        day.sort(key=lambda m: m["at"])
+
+    absences: dict[str, list] = {}
+    first, last = datetime(year, mon, 1).date(), (hi - timedelta(days=2)).date()
+    for a in db.execute(select(Absence).where(Absence.user_id == target.id, Absence.status.in_(("approved", "pending")),
+                                              Absence.start_date <= last, Absence.end_date >= first)).scalars():
+        d = max(a.start_date, first)
+        while d <= min(a.end_date, last):
+            absences.setdefault(d.isoformat(), []).append({"absence_id": a.id, "label": ABSENCE_LABEL[a.kind], "status": a.status,
+                                                           "minutes": a.minutes})
+            d += timedelta(days=1)
+
+    summary = summarize(month_days(db, target, company, year, mon))
+    for d in summary["days"]:
+        d["marks"], d["pending"], d["absences"] = marks.get(d["date"], []), pending.get(d["date"], []), absences.get(d["date"], [])
+    return {
+        "user": {"id": target.id, "name": target.name, "job_title": target.job_title},
+        "month": month, "closed": month_is_closed(db, company.id, month),
+        "can_treat": perm.can_approve(actor, target), "can_justify": perm.can(actor, "absences.register"),
+        **summary,
+    }
 
 
 # --- Fechamento mensal -------------------------------------------------------
