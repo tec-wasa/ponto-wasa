@@ -403,3 +403,9 @@ label.check input { width: 22px; min-height: 22px; height: 22px; margin: 2px 0 0
 }
 .area-switch a.on { background: var(--avatar-bg); color: var(--avatar-text); }
 @media (min-width: 768px) { .area-switch { margin-left: 16px; } }
+
+/* Telas médias: a navegação da Gestão (até 8 itens) desce para uma segunda linha em vez de rolar escondida */
+@media (min-width: 768px) and (max-width: 1279px) {
+  .topbar { flex-wrap: wrap; row-gap: 0; }
+  .topnav { order: 3; flex-basis: 100%; margin: 0 0 10px; flex-wrap: wrap; overflow: visible; }
+}

@@ -9,11 +9,12 @@ export type Permission =
 export interface User {
   id: number;
   name: string;
-  email: string;
+  email: string | null; // vazio = só bate ponto na Central
   cpf: string;
   role: Role;
   roles?: Role[]; // funções de gestão acumuláveis (admin, hr, manager; auditor sozinho)
   tracks_time?: boolean; // false: cadastro só de gestão, não registra ponto
+  app_access?: boolean; // false: só bate ponto na Central, sem login
   permissions?: Permission[]; // só em /auth/me: o que a pessoa pode fazer (backend/app/permissions.py)
   scope?: "self" | "team" | "company"; // alcance na gestão
   manager_id: number | null;

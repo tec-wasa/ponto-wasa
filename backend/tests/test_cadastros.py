@@ -84,3 +84,39 @@ def test_kiosk_delete_requires_revocation_and_keeps_punches(client, world, db):
     assert client.delete(f"/kiosks/{k['id']}", headers=world["admin"]).status_code == 204
     assert db.get(Kiosk, k["id"]) is None
     assert any("Central" in p["origin"] for p in client.get("/punches", headers=world["emp"]).json())  # histórico preservado
+
+
+def test_kiosk_only_person_has_no_login(client, world):
+    adm = world["admin"]
+    r = client.post("/users", headers=adm, json={"name": "Zeca Central", "cpf": make_cpf(400000001), "app_access": False})
+    assert r.status_code == 201, r.text
+    z = r.json()
+    assert z["email"] is None and z["app_access"] is False and z["punch_policy"] == "kiosk"
+    # não pode ter função de gestão, nem voltar a "aplicativo e Central" sem acesso
+    assert client.patch(f"/users/{z['id']}", headers=adm, json={"roles": ["manager"]}).status_code == 422
+    assert client.patch(f"/users/{z['id']}", headers=adm, json={"punch_policy": "both"}).status_code == 422
+    assert client.post(f"/users/{z['id']}/reset-password", headers=adm).status_code == 409
+    # liberar o acesso exige e-mail; depois, a senha temporária sai por "Nova senha"
+    assert client.patch(f"/users/{z['id']}", headers=adm, json={"app_access": True}).status_code == 422
+    r = client.patch(f"/users/{z['id']}", headers=adm, json={"app_access": True, "email": "zeca@a.com"})
+    assert r.status_code == 200 and r.json()["app_access"] is True
+    temp = client.post(f"/users/{z['id']}/reset-password", headers=adm).json()["password"]
+    assert client.post("/auth/login", json={"email": "zeca@a.com", "password": temp}).status_code == 200
+    # tirar o acesso derruba o login
+    assert client.patch(f"/users/{z['id']}", headers=adm, json={"app_access": False}).json()["punch_policy"] == "kiosk"
+    assert client.post("/auth/login", json={"email": "zeca@a.com", "password": temp}).status_code == 401
+
+
+def test_app_user_needs_email_and_password(client, world):
+    adm = world["admin"]
+    base = {"name": "Sem Email", "cpf": make_cpf(400000002)}
+    assert client.post("/users", headers=adm, json=base).status_code == 422
+    assert client.post("/users", headers=adm, json={**base, "email": "se@a.com"}).status_code == 422  # falta senha
+
+
+def test_manager_must_have_management_function(client, world):
+    adm, ids = world["admin"], world["ids"]
+    r = client.patch(f"/users/{ids['other']}", headers=adm, json={"manager_id": ids["emp"]})  # ana é colaboradora
+    assert r.status_code == 422 and "Gestor" in r.json()["detail"]
+    assert client.patch(f"/users/{ids['other']}", headers=adm, json={"manager_id": ids["mgr"]}).status_code == 200
+    assert client.patch(f"/users/{ids['mgr']}", headers=adm, json={"manager_id": ids["mgr"]}).status_code == 422

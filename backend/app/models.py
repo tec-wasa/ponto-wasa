@@ -80,12 +80,13 @@ class User(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
     name: Mapped[str] = mapped_column(String(200))
-    email: Mapped[str] = mapped_column(String(200), unique=True)
+    email: Mapped[str | None] = mapped_column(String(200), unique=True, default=None)  # login; vazio = só usa a Central
     cpf: Mapped[str] = mapped_column(String(11))  # só dígitos, validado; obrigatório (identifica o trabalhador no REP-P)
     password_hash: Mapped[str] = mapped_column(String(300))
     role: Mapped[str] = mapped_column(String(20), default="employee")  # perfil mais alto de `roles` (compatibilidade): employee|manager|hr|admin|auditor
     roles: Mapped[str] = mapped_column(String(60), default="", server_default="")  # funções de gestão acumuláveis, ex.: "admin,hr,manager"
     tracks_time: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())  # False = só gere, não bate ponto
+    app_access: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())  # False = só bate ponto na Central, sem login
     manager_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), default=None)
     schedule_id: Mapped[int | None] = mapped_column(ForeignKey("schedules.id"), default=None)
     active: Mapped[bool] = mapped_column(Boolean, default=True)

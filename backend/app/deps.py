@@ -35,7 +35,7 @@ def get_current_user(
     decoded = decode_token(creds.credentials, "access") if creds else None
     user = db.get(User, decoded[0]) if decoded else None
     # A versão do token precisa bater: trocar senha, redefinir ou mudar o 2FA derruba as sessões anteriores.
-    if user is None or not user.active or decoded[1] != user.token_version:
+    if user is None or not user.active or not user.app_access or decoded[1] != user.token_version:
         raise HTTPException(401, "Não autenticado")
     restriction = restriction_of(user)
     if restriction and request.url.path not in ALLOWED_WHEN_RESTRICTED:

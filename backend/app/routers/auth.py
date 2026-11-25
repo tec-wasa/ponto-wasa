@@ -72,7 +72,7 @@ def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
     if _is_throttled(db, ip, key):
         raise HTTPException(429, "Muitas tentativas de login. Aguarde alguns minutos e tente novamente.")
     user = db.execute(select(User).where(User.email == body.email.lower())).scalar_one_or_none()
-    if not user or not user.active or not verify_password(body.password, user.password_hash):
+    if not user or not user.active or not user.app_access or not verify_password(body.password, user.password_hash):
         raise _fail(db, ip, key, 401, "E-mail ou senha inválidos")
 
     used_2fa = False
@@ -92,7 +92,7 @@ def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
 def refresh(body: RefreshIn, db: Session = Depends(get_db)):
     decoded = decode_token(body.refresh_token, "refresh")
     user = db.get(User, decoded[0]) if decoded else None
-    if not user or not user.active or decoded[1] != user.token_version:
+    if not user or not user.active or not user.app_access or decoded[1] != user.token_version:
         raise HTTPException(401, "Token inválido")
     return _tokens(user)
 

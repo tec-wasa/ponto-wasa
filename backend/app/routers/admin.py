@@ -1,3 +1,4 @@
+import secrets
 from datetime import UTC, datetime
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -43,6 +44,26 @@ from ..services import kiosk as kiosk_svc
 router = APIRouter(tags=["cadastros"])
 
 NO_PURPOSE = "Quem não registra ponto precisa ter ao menos uma função de gestão (senão o cadastro não serve para nada)"
+
+
+NEEDS_LOGIN = "Quem tem função de gestão ou não registra ponto precisa entrar no aplicativo"
+
+
+def _check_manager(db: Session, actor: User, manager_id: int | None, person_id: int | None = None) -> None:
+    mgr = _same_company(db, actor, User, manager_id, "Gestor")
+    if mgr is None:
+        return
+    if mgr.id == person_id:
+        raise HTTPException(422, "A pessoa não pode ser gestora de si mesma")
+    if not mgr.active or not perm.can(mgr, "approvals"):
+        raise HTTPException(422, f"{mgr.name} não tem a função Gestor (nem RH ou Administração) para ser gestor de alguém")
+
+
+def _check_access(app_access: bool, email: str | None, tracks_time: bool, roles: list[str]) -> None:
+    if not app_access and (roles or not tracks_time):
+        raise HTTPException(422, NEEDS_LOGIN)
+    if app_access and not email:
+        raise HTTPException(422, "Informe o e-mail: é com ele que a pessoa entra no aplicativo")
 
 
 def _resolve_roles(actor: User, roles: list[str] | None, role: str | None) -> list[str]:
@@ -114,15 +135,21 @@ def create_user(
     roles = _resolve_roles(actor, body.roles, body.role)
     if not body.tracks_time and not roles:
         raise HTTPException(422, NO_PURPOSE)
-    _same_company(db, actor, User, body.manager_id, "Gestor")
+    _check_access(body.app_access, body.email, body.tracks_time, roles)
+    if body.app_access and not body.password:
+        raise HTTPException(422, "Informe a senha inicial (a pessoa troca no primeiro acesso)")
+    _check_manager(db, actor, body.manager_id)
     _same_company(db, actor, Schedule, body.schedule_id, "Jornada")
     if db.execute(select(User.id).where(User.company_id == actor.company_id, User.cpf == body.cpf)).first():
         raise HTTPException(409, "CPF já cadastrado nesta empresa")
     user = User(
-        company_id=actor.company_id, name=body.name, email=body.email.lower(), cpf=body.cpf,
-        password_hash=hash_password(body.password), role=top_role(roles), roles=",".join(roles),
-        tracks_time=body.tracks_time, manager_id=body.manager_id, schedule_id=body.schedule_id, admitted_at=body.admitted_at,
-        job_title=body.job_title, must_change_password=body.must_change_password,
+        company_id=actor.company_id, name=body.name, email=body.email.lower() if body.email else None, cpf=body.cpf,
+        # sem acesso ao app: senha aleatória que ninguém conhece (o login também é recusado por app_access)
+        password_hash=hash_password(body.password if body.app_access else secrets.token_urlsafe(32)),
+        role=top_role(roles), roles=",".join(roles), tracks_time=body.tracks_time, app_access=body.app_access,
+        punch_policy="both" if body.app_access else "kiosk",
+        manager_id=body.manager_id, schedule_id=body.schedule_id, admitted_at=body.admitted_at,
+        job_title=body.job_title, must_change_password=body.must_change_password and body.app_access,
     )
     db.add(user)
     kiosk_svc.assign_code(db, user)  # código interno para a Central
@@ -166,10 +193,17 @@ def patch_user(
         raise HTTPException(422, "Esta pessoa não registra ponto, então não tem banco de horas")
     if data.get("tracks_time") is False and user.hour_bank_enabled:
         data["hour_bank_enabled"] = False
+    final_access = data.get("app_access", user.app_access)
+    if "app_access" in data or "roles" in data or "tracks_time" in data or "email" in data:
+        _check_access(final_access, data.get("email") or user.email, data.get("tracks_time", user.tracks_time), [r for r in final_roles if r])
+    if data.get("app_access") is False:
+        if user.id == actor.id:
+            raise HTTPException(409, "Você não pode tirar o seu próprio acesso ao aplicativo")
+        data["punch_policy"] = "kiosk"  # sem login, só a Central registra o ponto
+    if data.get("punch_policy") == "both" and not final_access:
+        raise HTTPException(422, "Sem acesso ao aplicativo a pessoa só bate ponto na Central")
     if "manager_id" in data:
-        _same_company(db, actor, User, data["manager_id"], "Gestor")
-        if data["manager_id"] == user.id:
-            raise HTTPException(422, "A pessoa não pode ser gestora de si mesma")
+        _check_manager(db, actor, data["manager_id"], user.id)
     if data.get("email"):
         data["email"] = data["email"].lower()
     if data.get("cpf") is not None and data["cpf"] != user.cpf:
@@ -189,6 +223,8 @@ def patch_user(
     before = {k: getattr(user, k) for k in data}
     for k, v in data.items():
         setattr(user, k, v)
+    if before.get("app_access") and data.get("app_access") is False:
+        user.token_version += 1  # derruba as sessões abertas
     try:
         db.flush()
     except IntegrityError:
@@ -401,6 +437,8 @@ def _target_for_recovery(db: Session, actor: User, user_id: int) -> User:
         raise HTTPException(409, "Para a sua própria conta use Minha conta")
     if perm.is_privileged(user) and not perm.can(actor, "people.permissions"):
         raise HTTPException(403, "Somente a Administração altera quem tem função de gestão")
+    if not user.app_access:
+        raise HTTPException(409, "Esta pessoa não entra no aplicativo (só bate ponto na Central). Libere o acesso no cadastro antes.")
     return user
 
 

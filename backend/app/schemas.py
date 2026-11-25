@@ -30,9 +30,10 @@ class RefreshIn(BaseModel):
 
 class UserIn(BaseModel):
     name: str = Field(min_length=2, max_length=200)
-    email: EmailStr
+    email: EmailStr | None = None  # obrigatório para quem entra no aplicativo
     cpf: str  # obrigatório: identifica o trabalhador nos registros do REP-P
-    password: str = Field(min_length=8)
+    password: str | None = Field(None, min_length=8)  # senha inicial (temporária) de quem entra no aplicativo
+    app_access: bool = True  # False: só bate ponto na Central, sem login
     role: str = "employee"  # legado: um só perfil; prefira `roles`
     roles: list[str] | None = None  # funções de gestão acumuláveis: admin, hr, manager (ou só auditor)
     tracks_time: bool = True  # False: só gere, não bate ponto (sem espelho, banco de horas, ajustes)
@@ -61,6 +62,7 @@ class UserPatch(BaseModel):
     role: str | None = None
     roles: list[str] | None = None
     tracks_time: bool | None = None
+    app_access: bool | None = None
     manager_id: int | None = None
     schedule_id: int | None = None
     active: bool | None = None
@@ -79,11 +81,12 @@ class UserPatch(BaseModel):
 class UserOut(ORM):
     id: int
     name: str
-    email: str
+    email: str | None
     cpf: str
     role: str
     roles: list[str] = []
     tracks_time: bool = True
+    app_access: bool = True
     manager_id: int | None
     schedule_id: int | None
     active: bool

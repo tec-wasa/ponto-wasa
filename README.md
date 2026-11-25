@@ -108,9 +108,17 @@ Aplicativo à parte para o tablet compartilhado: abre em `https://<domínio>/cen
 
 Leitores em modo teclado (padrão de fábrica) funcionam na espera e na tela do QR: a leitura rápida de um QR do Ponto identifica a pessoa. Testado só por unidade; falta um leitor real. **Central sem internet (opção C):** só o QR do crachá impresso vale; a batida (QR, foto, hora, posição) fica na fila do aparelho e o servidor confere tudo no envio (`POST /kiosk/offline-punch`); recusas vão para a auditoria e para Divergências da Central. Desligada se a empresa exige PIN. Detalhes e limites em `docs/central-do-ponto.md` (seção 8). NFC não foi feito.
 
-## Perfis acumuláveis e cadastros só de gestão
+## Pessoas, funções e áreas do aplicativo
 
-Cada pessoa pode ter **várias funções ao mesmo tempo**: Administrador, RH e Gestor (o Auditor, só de leitura, não acumula). O Administrador é o perfil mestre e já inclui o poder do RH e do Gestor; marcar as três serve para deixar claro o papel da pessoa. Separadamente, a opção **"Registra ponto"** define se a pessoa bate ponto: quem só faz a gestão (por exemplo, a administradora de uma empresa pequena) deixa desmarcada e passa a não ter Espelho, banco de horas nem marcação, não aparece nas listas da equipe, nos crachás e no AEJ, e a Central e o aplicativo recusam a batida. Só o Administrador altera funções (em Gestão > Pessoas > Editar dados).
+Cada pessoa tem três escolhas independentes, todas no mesmo formulário (Gestão > Cadastros > Pessoas, para cadastrar e para editar):
+
+- **Registra ponto**: a pessoa está sob controle de jornada (espelho, banco de horas, ajustes). Desmarcado = cadastro só de gestão.
+- **Entra no aplicativo**: desmarcado = só bate ponto na Central, sem e-mail nem senha. Quem tem função de gestão ou não registra ponto precisa entrar.
+- **Funções de gestão** (acumuláveis, só a Administração atribui): **Administração** (perfil mestre: empresa, configurações, centrais, permissões, auditoria, e tudo do RH e do Gestor), **RH** (cadastros, jornadas, ausências, banco de horas, fechamento, relatórios e arquivos fiscais da empresa toda) e **Gestor** (a própria equipe: painel, espelhos e aprovações). O campo "Gestor" de cada pessoa só aceita quem tem uma dessas funções.
+
+O aplicativo tem duas áreas: **Meu ponto** (Ponto, Registros, Solicitações, Banco de horas), para quem registra ponto, e **Gestão** (Painel, Aprovações, Espelhos, Banco de horas, Ausências, Relatórios, Cadastros, Empresa), para quem tem alguma função. Quem tem as duas troca pelo seletor no topo. A regra de quem pode o quê fica em `backend/app/permissions.py` e é a mesma para a API e para as telas (`/auth/me` devolve as permissões).
+
+Autoaprovação: a Administração só decide o próprio pedido quando ninguém mais na empresa poderia decidi-lo, com justificativa obrigatória (fica como `self_approve` na auditoria).
 
 ## Editar e excluir cadastros
 
