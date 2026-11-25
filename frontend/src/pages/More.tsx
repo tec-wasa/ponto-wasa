@@ -23,6 +23,7 @@ export default function More({ items, area, both, onLogout }: Props) {
       ? { to: "/gestao", title: "Ir para a Gestão", hint: "Equipe, aprovações, cadastros" }
       : { to: "/", title: "Ir para Meu ponto", hint: "Registrar o meu ponto e ver os meus registros" }] : []),
     { to: "/conta", title: "Minha conta", hint: "Dados de acesso e segurança" },
+    { to: "/ajuda", title: "Ajuda", hint: "Manual: onde fica, o que é e como fazer cada coisa" },
     { to: "/diagnostico", title: "Diagnóstico do aplicativo", hint: "Por que o app instala (ou não) e se funciona sem internet" },
   ];
   return (

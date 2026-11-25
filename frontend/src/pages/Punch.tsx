@@ -366,7 +366,7 @@ export default function Punch({ online }: { online: boolean }) {
             <div key={q.key} className="alert error" role="alert" style={{ marginTop: 12 }}>
               <b>{SLOT_LABEL[q.kind as Kind]} de {fmtDateTime(q.occurred_at, tz)} não foi aceita:</b> {q.error}
               <p className="small" style={{ margin: "4px 0 8px" }}>
-                Ela não vale como registro. Se você realmente trabalhou nesse horário, peça a inclusão em <b>Ajustes</b>; seu gestor aprova.
+                Ela não vale como registro. Se você realmente trabalhou nesse horário, peça a inclusão em <b>Solicitações</b>; seu gestor aprova.
               </p>
               <button onClick={() => { remove(localStorage, user!.id, q.key); refreshQueue(); notifyQueue(); }}>Descartar</button>
             </div>

@@ -8,6 +8,7 @@ import Approvals from "./pages/Approvals";
 import MyBank, { TeamBank } from "./pages/Bank";
 import Diagnostic from "./pages/Diagnostic";
 import { Privacy, Terms } from "./pages/Legal";
+import Help from "./pages/Help";
 import Login from "./pages/Login";
 import Mirror from "./pages/Mirror";
 import More from "./pages/More";
@@ -93,6 +94,7 @@ function TopBar({ user, area, both, children }: { user: User; area: "mine" | "mg
       )}
       {children}
       <div className="topbar-actions">
+        <Link to="/ajuda" className="icon-btn help-btn" aria-label="Ajuda: manual do aplicativo" title="Ajuda">?</Link>
         <ThemeToggle />
         <NavLink to="/conta" className="avatar" aria-label={`Minha conta: ${user.name}`}>{initials(user.name)}</NavLink>
       </div>
@@ -131,6 +133,7 @@ export default function App() {
         <Route path="/diagnostico" element={<Diagnostic />} />
         <Route path="/privacidade" element={<Privacy />} />
         <Route path="/termos" element={<Terms />} />
+        <Route path="/ajuda" element={<Help />} />
         <Route path="*" element={<Login />} />
       </Routes>
     );
@@ -154,7 +157,7 @@ export default function App() {
   const { mine, mgmt } = areaItems(can);
   const both = mine.length > 0 && mgmt.length > 0;
   const path = location.pathname;
-  const neutral = ["/mais", "/conta", "/diagnostico", "/privacidade", "/termos"].includes(path);
+  const neutral = ["/mais", "/conta", "/diagnostico", "/privacidade", "/termos", "/ajuda"].includes(path);
   const area: "mine" | "mgmt" = mine.length === 0 ? "mgmt" : mgmt.length === 0 ? "mine"
     : neutral ? lastArea.current : path.startsWith("/gestao") ? "mgmt" : "mine";
   lastArea.current = area;
@@ -193,6 +196,7 @@ export default function App() {
           {mgmt.some((i) => i.to === "/gestao/cadastros") && <Route path="/gestao/cadastros" element={<Cadastros />} />}
           {mgmt.some((i) => i.to === "/gestao/empresa") && <Route path="/gestao/empresa" element={<Empresa />} />}
           <Route path="/conta" element={<Account />} />
+          <Route path="/ajuda" element={<Help />} />
           <Route path="/diagnostico" element={<Diagnostic />} />
           <Route path="/privacidade" element={<Privacy />} />
           <Route path="/termos" element={<Terms />} />

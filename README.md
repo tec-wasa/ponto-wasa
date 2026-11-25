@@ -124,6 +124,10 @@ Autoaprovação: a Administração só decide o próprio pedido quando ninguém 
 
 Quem decide os pedidos de uma pessoa (gestor da equipe, RH, Administração) pode corrigir o mês dela por conta própria, sem esperar um pedido: incluir uma marcação esquecida, desconsiderar uma marcação errada e (RH/Administração) justificar o dia. A marcação original nunca é alterada: cada correção é um tratamento já aprovado, com motivo e autor, que entra no espelho e no AEJ, fica na auditoria (`treat`) e pode ser desfeito enquanto o mês estiver aberto (`revoke`). Mês fechado: reabra antes. A pessoa vê as correções em Solicitações e no espelho.
 
+## Ajuda (manual no aplicativo)
+
+A tela **Ajuda** (`/ajuda`; botão **?** no topo no computador, Mais > Ajuda no celular, link na tela de entrada) é o manual: um tópico por assunto (onde fica, o que é, passo a passo, dicas e cuidados), com busca, filtro "Para mim" (tópicos das funções da pessoa) ou "Tudo", sumário, link direto por tópico (`/ajuda#tratamento`) e impressão. O conteúdo fica em `frontend/src/help/content.ts`: **ao mudar uma tela, atualize o tópico dela**. O teste `content.test.ts` confere ids, grupos, atalhos para telas existentes e negritos.
+
 ## Painel: indicadores do mês
 
 O Painel (Gestão) abre com os indicadores do mês escolhido, calculados como o espelho e no escopo de quem vê (gestor: equipe; RH/Administração: empresa): horas trabalhadas e previstas, horas extras e débitos, faltas, dias com atraso (entrada além da tolerância de 5 min), dias a tratar (saída não registrada), aprovações pendentes e banco de horas. Abaixo, a situação de cada dia (completo, saída não registrada, falta) e o ranking por pessoa (saldo, faltas, atrasos), que leva ao Tratamento da pessoa. API: `GET /dashboard/month?month=AAAA-MM`. Em seguida, a situação de agora.

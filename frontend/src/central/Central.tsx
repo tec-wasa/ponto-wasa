@@ -327,7 +327,7 @@ export default function Central() {
         {screen === "unpaired" && (
           <>
             <h1 className="c-title">Parear esta central</h1>
-            <p className="c-sub">O administrador gera um código em Gestão → Centrais. Digite-o aqui (vale por 15 minutos).</p>
+            <p className="c-sub">O administrador gera um código em Gestão → Cadastros → Centrais. Digite-o aqui (vale por 15 minutos).</p>
             <input className="c-input" value={pairCode} maxLength={8} autoCapitalize="characters" autoComplete="off" aria-label="Código de pareamento"
               onChange={(e) => setPairCode(e.target.value.toUpperCase())} />
             {note && <div className="c-alert" role="alert">{note}</div>}
@@ -355,7 +355,7 @@ export default function Central() {
             <Steps at={1} />
             <Scanner onResult={onQr} onFail={qrFailed} />
             <h1 className="c-title">Mostre seu QR Code</h1>
-            <p className="c-sub">Use o crachá impresso ou o QR do aplicativo (Ponto → Meu crachá).</p>
+            <p className="c-sub">Use o crachá impresso ou o QR do aplicativo (Minha conta → Meu crachá).</p>
             <div className="c-actions">
               <button className="c-btn small ghost" onClick={() => { setMode("code"); setDigits(""); setScreen("code"); }}>Digitar código ou CPF</button>
               <button className="c-btn small ghost" onClick={() => home()}>Cancelar</button>

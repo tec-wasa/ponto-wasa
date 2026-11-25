@@ -93,7 +93,7 @@ export default function Login() {
         )}
       </section>
       <p className="muted small" style={{ textAlign: "center" }}>
-        <Link to="/privacidade">Política de privacidade</Link> · <Link to="/termos">Termos de uso</Link>
+        <Link to="/ajuda">Ajuda</Link> · <Link to="/privacidade">Política de privacidade</Link> · <Link to="/termos">Termos de uso</Link>
       </p>
     </main>
   );
