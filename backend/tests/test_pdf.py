@@ -171,7 +171,7 @@ def test_espelho_shows_missing_job_title_instead_of_hiding_it(client, world, db)
 def test_official_mirror_pdf_endpoint(client, world, treated_day):
     day, _ = treated_day
     month = f"{day:%Y-%m}"
-    r = client.get(f"/mirror/official.pdf?month={month}", headers=world["emp"])
+    r = client.get(f"/mirror/official.pdf?month={month}&modelo=detalhado", headers=world["emp"])
     assert r.status_code == 200 and r.headers["content-type"] == "application/pdf" and r.content[:5] == b"%PDF-"
     assert f"-{month}.pdf" in r.headers["content-disposition"]
     text = " ".join(pdf_text(r.content).split())
@@ -201,7 +201,7 @@ def test_job_title_is_stored_and_returned(client, world):
 
 def test_espelho_pdf_puts_each_mark_on_its_own_line_and_signals_signature(client, world, treated_day, signing_cert):
     day, _ = treated_day
-    r = client.get(f"/mirror/official.pdf?month={day:%Y-%m}", headers=world["emp"])
+    r = client.get(f"/mirror/official.pdf?month={day:%Y-%m}&modelo=detalhado", headers=world["emp"])
     lines = [l.strip() for l in pdf_text(r.content).splitlines()]
     for mark in ("07:00 Entrada (NSR", "08:00 Entrada (NSR", "12:00 Saída (NSR", "13:00 Entrada (NSR"):
         assert any(l.startswith(mark) for l in lines), f"linha própria para {mark}"  # nada de marcas coladas
@@ -240,3 +240,19 @@ def test_night_shift_is_shown_on_the_day_it_started(client, world, db):
     assert first["rep"][1].startswith("06:00 Saída") and first["rep"][1].endswith("(dia seguinte)")
     assert not any("06:00" in m for m in second["rep"])  # a saída não aparece solta no dia seguinte
     assert first["worked"] == 480 and first["night"] == 420 and first["reduced"] == 540  # 7 h noturnas viram 8 h
+
+
+def test_folha_de_ponto_is_one_portrait_page_with_treated_marks_and_signatures(client, world, treated_day):
+    import io
+
+    from pypdf import PdfReader
+    day, _ = treated_day
+    r = client.get(f"/mirror/official.pdf?month={day:%Y-%m}", headers=world["emp"])
+    assert r.status_code == 200 and "folha-de-ponto-" in r.headers["content-disposition"]
+    pages = PdfReader(io.BytesIO(r.content)).pages
+    assert len(pages) == 1 and pages[0].mediabox.height > pages[0].mediabox.width  # uma folha, retrato
+    text = " ".join(pdf_text(r.content).split())
+    for expected in ("Folha de Ponto", "DADOS DO EMPREGADOR", "DADOS DO COLABORADOR", "Quadro de Horários", "08:00 às 12:00",
+                     "Trabalhadas + Abono", "desconsiderada", "incluída", "Esqueci a saída",
+                     "Reconheço a exatidão e confirmo a frequência constante deste cartão", "ANA COLAB", "Página 1 de 1"):
+        assert expected in text, expected

@@ -265,7 +265,7 @@ def test_espelho_pdf_shows_the_justification(client, world, ana):
     import io
 
     from pypdf import PdfReader
-    pdf = client.get(f"/mirror/official.pdf?month={d:%Y-%m}", headers=world["emp"])
+    pdf = client.get(f"/mirror/official.pdf?month={d:%Y-%m}&modelo=detalhado", headers=world["emp"])
     text = " ".join("\n".join(p.extract_text() for p in PdfReader(io.BytesIO(pdf.content)).pages).split())
     assert "Ausência justificada (Licença)" in text
 

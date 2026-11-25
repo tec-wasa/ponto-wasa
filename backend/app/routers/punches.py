@@ -13,7 +13,7 @@ from ..db import get_db
 from ..deps import can_view_user, client_ip, get_current_user, require, require_punch
 from ..models import Company, Kiosk, Punch, User
 from ..schemas import PunchIn, PunchOut, ReceiptOut
-from ..services import audit, clock, pdfsign, signing
+from ..services import audit, clock, folha, pdfsign, signing
 from ..services import pdf as pdf_service
 from ..services.espelho import build_espelho
 from ..services.mirror import month_days, summarize
@@ -203,17 +203,22 @@ def mirror(
 @router.get("/mirror/official.pdf")
 def official_mirror(
     request: Request, month: str = Query(..., description="YYYY-MM"), user_id: int | None = None,
+    modelo: str = Query("folha", pattern="^(folha|detalhado)$", description="folha: uma página para assinatura; detalhado: com NSR"),
     actor: User = Depends(get_current_user), db: Session = Depends(get_db),
 ):
-    """Espelho de Ponto Eletrônico oficial (Portaria 671, Art. 84), em PDF."""
+    """Folha de ponto do mês para assinatura (uma página A4) ou o espelho detalhado (Portaria 671, Art. 84), em PDF."""
     if not re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", month):
         raise HTTPException(422, "Mês deve estar no formato YYYY-MM")
     target = db.get(User, user_id) if user_id else actor
     if not target or not can_view_user(db, actor, target):
         raise HTTPException(404, "Colaborador não encontrado")
-    data = build_espelho(db, db.get(Company, target.company_id), target, int(month[:4]), int(month[5:]))
-    document = pdf_service.espelho_pdf(data)
-    audit.log(db, actor, "export", "espelho", target.id, after={"month": month}, ip=client_ip(request))
+    company = db.get(Company, target.company_id)
+    if modelo == "folha":
+        document, name = folha.folha_pdf(folha.build_folha(db, company, target, int(month[:4]), int(month[5:]))), "folha-de-ponto"
+    else:
+        document = pdf_service.espelho_pdf(build_espelho(db, company, target, int(month[:4]), int(month[5:])))
+        name = "espelho"
+    audit.log(db, actor, "export", "espelho", target.id, after={"month": month, "modelo": modelo}, ip=client_ip(request))
     db.commit()
     return Response(document, media_type="application/pdf",
-                    headers={"Content-Disposition": f'attachment; filename="espelho-{target.cpf}-{month}.pdf"'})
+                    headers={"Content-Disposition": f'attachment; filename="{name}-{target.cpf}-{month}.pdf"'})

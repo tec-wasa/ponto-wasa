@@ -98,13 +98,14 @@ export default function Mirror({ mode = "self" }: { mode?: "self" | "team" }) {
     }
   }
 
-  async function officialPdf() {
+  async function officialPdf(modelo: "folha" | "detalhado") {
     setPdfBusy(true);
     setError("");
     try {
-      await download(`/mirror/official.pdf?month=${month}${target ? `&user_id=${target}` : ""}`, `espelho-${month}.pdf`);
+      await download(`/mirror/official.pdf?month=${month}&modelo=${modelo}${target ? `&user_id=${target}` : ""}`,
+        `${modelo === "folha" ? "folha-de-ponto" : "espelho"}-${month}.pdf`);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Erro ao gerar o espelho");
+      setError(e instanceof Error ? e.message : "Erro ao gerar o PDF");
     } finally {
       setPdfBusy(false);
     }
@@ -159,7 +160,10 @@ export default function Mirror({ mode = "self" }: { mode?: "self" | "team" }) {
           <p className="summary-line muted small">
             Faltas <b>{t.absences}</b> · Justificados <b>{t.justified_days}</b> · Incompletos <b>{t.incomplete_days}</b>
           </p>
-          <button onClick={officialPdf} disabled={pdfBusy}>{pdfBusy ? "Gerando…" : "Espelho oficial (PDF)"}</button>
+          <div className="row">
+            <button onClick={() => officialPdf("folha")} disabled={pdfBusy}>{pdfBusy ? "Gerando…" : "Folha de ponto (PDF)"}</button>
+            <button className="link" onClick={() => officialPdf("detalhado")} disabled={pdfBusy}>Espelho detalhado (com NSR)</button>
+          </div>
         </section>
       )}
 
