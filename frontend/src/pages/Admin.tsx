@@ -75,6 +75,26 @@ export function Empresa() {
 }
 
 // --- Jornadas -----------------------------------------------------------------
+/** Modelos prontos para o formulário de criar jornada. */
+const SCHEDULE_PRESETS = [
+  { label: "Integral 8 h", name: "Integral 8h", hours: "8", brk: "60", start: "08:00", brkStart: "12:00" },
+  { label: "6 h (15 min de intervalo)", name: "6 horas", hours: "6", brk: "15", start: "08:00", brkStart: "11:00" },
+  { label: "Meio período 4 h, sem intervalo", name: "Meio período 4h (estágio)", hours: "4", brk: "0", start: "08:00", brkStart: "12:00" },
+];
+
+/** Aviso (não bloqueia) quando o intervalo fica abaixo do mínimo da CLT (art. 71) para a carga informada. */
+function BreakHint({ hours, brk }: { hours: string; brk: string }) {
+  const h = Number(hours), b = Number(brk);
+  if (b === 0 && h > 0 && h <= 4) return <p className="muted small" style={{ margin: "0 0 12px" }}>Sem intervalo: o ponto do dia tem só <b>entrada</b> e <b>saída</b>.</p>;
+  const min = h > 6 ? 60 : h > 4 ? 15 : 0;
+  if (b >= min) return null;
+  return (
+    <p className="alert info small" style={{ margin: "0 0 12px" }}>
+      Para jornada acima de {h > 6 ? "6 h" : "4 h"}, a CLT (art. 71) exige intervalo de pelo menos {min} min. Confira antes de salvar.
+    </p>
+  );
+}
+
 function Schedules({ readOnly }: { readOnly: boolean }) {
   const [list, setList] = useState<Schedule[]>([]);
   const [name, setName] = useState("");
@@ -203,11 +223,12 @@ function Schedules({ readOnly }: { readOnly: boolean }) {
               </div>
               <div className="grid2 keep">
                 <label>Carga diária (h)<input type="number" min="0" max="12" step="0.25" value={editing.hours} onChange={(e) => setEditing({ ...editing, hours: e.target.value })} /></label>
-                <label>Intervalo (min)<input type="number" min="0" max="240" value={editing.brk} onChange={(e) => setEditing({ ...editing, brk: e.target.value })} /></label>
+                <label>Intervalo (min; 0 = sem intervalo)<input type="number" min="0" max="240" value={editing.brk} onChange={(e) => setEditing({ ...editing, brk: e.target.value })} /></label>
                 <label>Tolerância (máx. 10)<input type="number" min="0" max="10" value={editing.tol} onChange={(e) => setEditing({ ...editing, tol: e.target.value })} /></label>
                 <label>Primeira entrada<input type="time" required value={editing.start} onChange={(e) => setEditing({ ...editing, start: e.target.value })} /></label>
-                <label>Início do intervalo<input type="time" required value={editing.brkStart} onChange={(e) => setEditing({ ...editing, brkStart: e.target.value })} /></label>
+                {Number(editing.brk) > 0 && <label>Início do intervalo<input type="time" required value={editing.brkStart} onChange={(e) => setEditing({ ...editing, brkStart: e.target.value })} /></label>}
               </div>
+              <BreakHint hours={editing.hours} brk={editing.brk} />
               <p className="muted small">Só o nome muda sem efeito no cálculo. As demais mudanças valem para o Espelho de dias ainda abertos e são recusadas se um mês fechado tiver marcações de pessoas desta jornada. Tudo fica na auditoria.</p>
               <div className="row"><button className="primary">Salvar</button><button type="button" onClick={() => setEditing(null)}>Cancelar</button></div>
             </form>
@@ -232,6 +253,15 @@ function Schedules({ readOnly }: { readOnly: boolean }) {
         <details className="fold">
           <summary>Criar uma jornada</summary>
           <form className="card" onSubmit={create}>
+            <p className="section-title" style={{ marginTop: 0 }}>Começar de um modelo</p>
+            <div className="quick" role="group" aria-label="Modelos de jornada" style={{ marginBottom: 12 }}>
+              {SCHEDULE_PRESETS.map((p) => (
+                <button type="button" key={p.label} className="fchip" onClick={() => {
+                  if (!name.trim()) setName(p.name);
+                  setHours(p.hours); setBrk(p.brk); setStart(p.start); setBrkStart(p.brkStart); setDays([0, 1, 2, 3, 4]); setCrosses(false);
+                }}>{p.label}</button>
+              ))}
+            </div>
             <label>Nome<input required value={name} onChange={(e) => setName(e.target.value)} /></label>
             <p className="section-title">Dias de trabalho</p>
             <div className="quick" role="group" aria-label="Dias de trabalho">
@@ -242,11 +272,12 @@ function Schedules({ readOnly }: { readOnly: boolean }) {
             </div>
             <div className="grid2 keep">
               <label>Carga diária (h)<input type="number" min="0" max="12" step="0.25" value={hours} onChange={(e) => setHours(e.target.value)} /></label>
-              <label>Intervalo (min)<input type="number" min="0" max="240" value={brk} onChange={(e) => setBrk(e.target.value)} /></label>
+              <label>Intervalo (min; 0 = sem intervalo)<input type="number" min="0" max="240" value={brk} onChange={(e) => setBrk(e.target.value)} /></label>
               <label>Tolerância (máx. 10)<input type="number" min="0" max="10" value={tol} onChange={(e) => setTol(e.target.value)} /></label>
               <label>Primeira entrada<input type="time" required value={start} onChange={(e) => setStart(e.target.value)} /></label>
-              <label>Início do intervalo<input type="time" required value={brkStart} onChange={(e) => setBrkStart(e.target.value)} /></label>
+              {Number(brk) > 0 && <label>Início do intervalo<input type="time" required value={brkStart} onChange={(e) => setBrkStart(e.target.value)} /></label>}
             </div>
+            <BreakHint hours={hours} brk={brk} />
             <label className="check">
               <input type="checkbox" checked={crosses} onChange={(e) => setCrosses(e.target.checked)} />
               <span>

@@ -801,12 +801,22 @@ export const TOPICS: Topic[] = [
           "**Nome** (ex.: Comercial 8h).",
           "**Dias de trabalho**: toque nos dias para marcar e desmarcar.",
           "**Carga diária (h)**: horas a trabalhar por dia (ex.: 8 ou 7,33).",
-          "**Intervalo (min)**: duração do almoço (ex.: 60).",
+          "Se quiser, toque num **modelo** em Começar de um modelo (Integral 8 h, 6 h ou **Meio período 4 h, sem intervalo**): ele preenche os campos e você só ajusta.",
+          "**Intervalo (min; 0 = sem intervalo)**: duração do almoço (ex.: 60). Com **0**, o campo Início do intervalo some e o ponto do dia passa a ter só entrada e saída.",
           "**Tolerância** (máximo de 10 minutos por dia): diferenças até esse limite não viram saldo.",
           "**Primeira entrada** e **Início do intervalo**: os horários de referência (usados para atraso e para a folha de ponto).",
           "Para turnos noturnos, marque a opção de a jornada virar a meia-noite (terminar no dia seguinte). Ela também pode ser ligada depois, na lista de jornadas.",
           "Toque em **Criar jornada**. Depois, escolha a jornada no cadastro de cada pessoa.",
         ],
+      },
+      {
+        h: "Meio período e estágio (4 h sem intervalo)",
+        steps: [
+          "Em **Criar uma jornada**, toque no modelo **Meio período 4 h, sem intervalo** (ou preencha Carga diária **4** e Intervalo **0**).",
+          "Ajuste o **Nome** (ex.: Estágio manhã), os **Dias de trabalho** e a **Primeira entrada** (ex.: 08:00 para a manhã, 13:00 para a tarde).",
+          "Toque em **Criar jornada** e escolha essa jornada no cadastro de cada estagiário.",
+        ],
+        tip: "Até 4 h por dia a lei não exige intervalo. De 4 h a 6 h, são 15 min; acima de 6 h, 1 h (CLT art. 71). O formulário avisa quando o intervalo fica abaixo disso. Para estágio, a Lei 11.788 limita a 6 h por dia e 30 h por semana.",
       },
       {
         h: "Editar e excluir",
