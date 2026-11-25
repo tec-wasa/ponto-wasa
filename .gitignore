@@ -26,3 +26,6 @@ Thumbs.db
 *.pem
 !deploy/.env.example
 ensaio/
+
+# Planilhas de importação com dados pessoais (CPF): nunca vão para o Git
+importacao/
