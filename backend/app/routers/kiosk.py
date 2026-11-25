@@ -1,6 +1,7 @@
 """Central do Ponto: aparelho compartilhado onde cada pessoa se identifica (QR, código ou CPF; PIN opcional) e registra o
 ponto com foto obrigatória. O aparelho se autentica por token (pareamento); a pessoa recebe só um ticket de uso único."""
 import secrets
+import time
 from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -509,15 +510,19 @@ def my_rotating_badge(user: User = Depends(get_current_user), db: Session = Depe
 
 
 class PinIn(BaseModel):
-    password: str
+    password: str | None = None  # exigida para quem entrou com senha
     pin: str = Field(min_length=4, max_length=6)
 
 
 @router.post("/auth/pin")
 def set_my_pin(body: PinIn, request: Request, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """Define ou troca o PIN. Pede a senha atual: quem pegar a sessão aberta não consegue trocar o PIN."""
+    """Define ou troca o PIN. Pede a senha atual (quem pegar a sessão aberta não consegue trocar o PIN); para quem entrou pelo
+    Google, que não tem senha do app, vale ter entrado há pouco (até 15 minutos)."""
     require_punch(user)
-    if not verify_password(body.password, user.password_hash):
+    if getattr(request.state, "amr", "pwd") == "google":
+        if time.time() - getattr(request.state, "token_iat", 0) > 15 * 60:
+            raise HTTPException(403, {"code": "reauth_required", "message": "Por segurança, saia e entre de novo com o Google para trocar o PIN."})
+    elif not verify_password(body.password or "", user.password_hash):
         raise HTTPException(403, "Senha atual incorreta")
     try:
         svc.set_pin(user, body.pin, _now())

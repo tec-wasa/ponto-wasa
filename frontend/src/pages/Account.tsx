@@ -2,12 +2,14 @@ import { useState, type FormEvent } from "react";
 import { api } from "../api";
 import { useAuth } from "../auth";
 import { ROLE_LABEL, initials } from "../util";
+import { GoogleButton, googleSignOut, useConfig } from "../google";
 import MyBadge from "./MyBadge";
 
 interface Tokens { access_token: string; refresh_token: string }
 
 export default function Account() {
   const { user, company, restriction, twoFactor, can, logout } = useAuth();
+  const passwords = company?.password_login !== false || !!restriction; // a empresa pode deixar só o Google
   const funcs = (user?.roles ?? []).filter((r) => r !== "auditor").map((r) => ROLE_LABEL[r]);
   const who = [...funcs, ...(can("punch") ? [] : ["não registra ponto"])].join(" · ") || "Colaborador";
   const forced = restriction === "password_change_required";
@@ -33,7 +35,9 @@ export default function Account() {
         </div>
       </section>
 
-      {restriction !== "two_factor_required" && (
+      {!restriction && <SignIn />}
+
+      {passwords && restriction !== "two_factor_required" && (
         <details className="fold" open={forced}>
           <summary>Trocar a senha</summary>
           <ChangePassword />
@@ -44,12 +48,68 @@ export default function Account() {
           <p className="section-title" style={{ marginTop: 20 }}>
             Segurança{twoFactor?.enabled ? " · 2FA ativo" : ""}
           </p>
-          <TwoFactor />
+          {passwords && <TwoFactor />}
           {can("punch") && <MyBadge />}
         </>
       )}
-      <button style={{ width: "100%", marginTop: 20 }} onClick={logout}>Sair</button>
+      <button style={{ width: "100%", marginTop: 20 }} onClick={() => { googleSignOut(); logout(); }}>Sair</button>
     </>
+  );
+}
+
+/** Como a pessoa entra: conta Google vinculada (ou não) e, se a empresa permitir, e-mail e senha. */
+function SignIn() {
+  const { user, company, reload } = useAuth();
+  const config = useConfig();
+  const [msg, setMsg] = useState<{ type: "ok" | "error"; text: string } | null>(null);
+  const [confirm, setConfirm] = useState(false);
+  if (!config?.google_client_id) return null;
+
+  async function link(credential: string) {
+    try {
+      await api("/auth/google/link", { method: "POST", body: { credential } });
+      await reload();
+      setMsg({ type: "ok", text: "Conta Google vinculada. Da próxima vez, use “Entrar com Google”." });
+    } catch (e) {
+      setMsg({ type: "error", text: e instanceof Error ? e.message : "Erro" });
+    }
+  }
+
+  async function unlink() {
+    try {
+      await api("/auth/google/unlink", { method: "POST" });
+      await reload();
+      setConfirm(false);
+      setMsg({ type: "ok", text: "Conta Google desvinculada." });
+    } catch (e) {
+      setMsg({ type: "error", text: e instanceof Error ? e.message : "Erro" });
+    }
+  }
+
+  return (
+    <section className="card" aria-labelledby="h-entrar">
+      <h2 id="h-entrar" className="section-title">Como você entra</h2>
+      {msg && <p className={`alert ${msg.type}`} role={msg.type === "error" ? "alert" : "status"}>{msg.text}</p>}
+      {user?.google_linked ? (
+        <>
+          <p style={{ margin: "0 0 8px" }}>Conta Google <b>vinculada</b>{user.login_method === "google" ? " (você entrou por ela agora)" : ""}.</p>
+          {company?.password_login !== false && (confirm ? (
+            <div className="row">
+              <button className="danger" onClick={unlink}>Confirmar: desvincular</button>
+              <button onClick={() => setConfirm(false)}>Voltar</button>
+            </div>
+          ) : <button className="link" style={{ padding: 0 }} onClick={() => setConfirm(true)}>Desvincular a conta Google</button>)}
+        </>
+      ) : (
+        <>
+          <p className="muted small" style={{ marginTop: 0 }}>
+            Vincule a sua conta Google para entrar com um toque, sem senha. Pode ser uma conta com outro e-mail.
+          </p>
+          <GoogleButton clientId={config.google_client_id} onCredential={link} text="continue_with" />
+        </>
+      )}
+      {company?.password_login === false && <p className="muted small" style={{ margin: "8px 0 0" }}>Nesta empresa o acesso é só pelo Google.</p>}
+    </section>
   );
 }
 

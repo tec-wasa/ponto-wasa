@@ -32,7 +32,7 @@ cd deploy && cp .env.example .env && chmod 600 .env && mkdir -p secrets
 openssl rand -hex 24      # OWNER_DB_PASSWORD e APP_DB_PASSWORD (valores diferentes)
 openssl rand -base64 36   # SECRET_KEY e TOTP_KEY (valores diferentes; guarde a TOTP_KEY junto do backup)
 ```
-No `.env`: `PONTO_IMAGE=ponto:local`, `DOMAIN=<nome ou IP>`, senhas e chaves acima, `REQUIRE_2FA_ROLES=hr,admin` (opcional).
+No `.env`: `PONTO_IMAGE=ponto:local`, `DOMAIN=<nome ou IP>`, senhas e chaves acima, `REQUIRE_2FA_ROLES=hr,admin` (opcional), `GOOGLE_CLIENT_ID=<id>.apps.googleusercontent.com` (login com Google) e `DEV_NAME`/`DEV_EMAIL` (aparecem na política de privacidade e nos termos).
 
 **HTTPS com Cloudflare Tunnel** (VM que já usa 80/443 para outro serviço; câmera e GPS exigem HTTPS): no `.env` ponha `DOMAIN=ponto.<domínio>` e `CLOUDFLARE_TUNNEL_TOKEN=<token>`, e suba com `docker compose -f docker-compose.yml -f docker-compose.tunnel.yml up -d` (nos passos seguintes, use sempre esses dois `-f`). Detalhes no cabeçalho de `deploy/docker-compose.tunnel.yml`.
 

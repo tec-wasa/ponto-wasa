@@ -17,6 +17,9 @@ export interface User {
   app_access?: boolean; // false: só bate ponto na Central, sem login
   permissions?: Permission[]; // só em /auth/me: o que a pessoa pode fazer (backend/app/permissions.py)
   scope?: "self" | "team" | "company"; // alcance na gestão
+  google_linked?: boolean; // só em /auth/me
+  login_method?: "pwd" | "google"; // como entrou nesta sessão
+  restriction?: string | null; // pendência de segurança desta sessão
   manager_id: number | null;
   schedule_id: number | null;
   active: boolean;
@@ -43,6 +46,7 @@ export interface Company {
   workplace: string | null;
   photo_enabled?: boolean;
   kiosk_pin_required?: boolean;
+  password_login?: boolean; // false: só "Entrar com Google"
 }
 
 export interface Kiosk {

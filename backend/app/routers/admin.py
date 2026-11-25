@@ -10,6 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .. import permissions as perm
+from ..config import settings
 from ..db import get_db
 from ..deps import client_ip, get_current_user, require
 from ..models import (
@@ -114,6 +115,11 @@ def patch_company(
             ZoneInfo(data["timezone"] or "")
         except (ValueError, KeyError, ZoneInfoNotFoundError):
             raise HTTPException(422, "Fuso horário inválido") from None
+    if data.get("password_login") is False and company.password_login:
+        if not actor.google_sub:
+            raise HTTPException(409, "Vincule a sua conta Google em Minha conta antes de desligar a senha; senão você perde o acesso.")
+        if not settings.google_client_id:
+            raise HTTPException(409, "O login com Google não está configurado neste servidor")
     changed = {k: v for k, v in data.items() if getattr(company, k) != v}
     if not changed:
         return company

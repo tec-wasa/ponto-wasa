@@ -13,15 +13,18 @@ log = logging.getLogger("ponto.request")
 
 # Páginas do Swagger carregam scripts de CDN e usam inline: ficam fora da CSP estrita (e são desligadas em produção).
 _CSP_EXEMPT = ("/docs", "/redoc", "/openapi.json")
+# "Entrar com Google" (Google Identity Services): script, estilo, iframe do botão e chamadas em accounts.google.com/gsi.
+_GSI = "https://accounts.google.com/gsi/"
 CSP = (
-    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; "
-    "connect-src 'self'; manifest-src 'self'; worker-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+    f"default-src 'self'; script-src 'self' {_GSI}client; style-src 'self' 'unsafe-inline' {_GSI}style; img-src 'self' data: blob:; "
+    f"connect-src 'self' {_GSI}; frame-src {_GSI}; manifest-src 'self'; worker-src 'self'; frame-ancestors 'none'; "
+    "base-uri 'self'; form-action 'self'"
 )
 SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",
     "X-Frame-Options": "DENY",
     "Referrer-Policy": "same-origin",
-    "Cross-Origin-Opener-Policy": "same-origin",
+    "Cross-Origin-Opener-Policy": "same-origin-allow-popups",  # a janela do "Entrar com Google" precisa falar com a página
     # geolocalização só para o próprio site (registro de ponto); câmera e microfone nunca
     "Permissions-Policy": "geolocation=(self), camera=(self), microphone=(), payment=()",
 }

@@ -409,3 +409,9 @@ label.check input { width: 22px; min-height: 22px; height: 22px; margin: 2px 0 0
   .topbar { flex-wrap: wrap; row-gap: 0; }
   .topnav { order: 3; flex-basis: 100%; margin: 0 0 10px; flex-wrap: wrap; overflow: visible; }
 }
+
+/* Páginas de política de privacidade e termos */
+.legal h2 { font-size: 16px; margin: 20px 0 6px; }
+.legal p, .legal li { line-height: 1.55; }
+.legal ul { padding-left: 20px; margin: 6px 0; }
+.legal li { margin: 4px 0; }

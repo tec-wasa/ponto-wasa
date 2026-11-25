@@ -25,7 +25,7 @@ class TokenOut(BaseModel):
 
 
 class RefreshIn(BaseModel):
-    refresh_token: str
+    refresh_token: str | None = None  # o navegador usa o cookie HttpOnly; o corpo fica para outros clientes
 
 
 class UserIn(BaseModel):
@@ -109,6 +109,9 @@ class UserOut(ORM):
 class MeOut(UserOut):
     permissions: list[str] = []  # ações permitidas (ver app/permissions.py)
     scope: str = "self"  # alcance na gestão: self | team | company
+    google_linked: bool = False
+    login_method: str = "pwd"  # como entrou nesta sessão: pwd | google
+    restriction: str | None = None  # pendência de segurança desta sessão (senha temporária, 2FA exigido)
 
 
 class CompanyOut(ORM):
@@ -123,6 +126,7 @@ class CompanyOut(ORM):
     workplace: str | None
     photo_enabled: bool = False
     kiosk_pin_required: bool = False
+    password_login: bool = True
 
 
 class CompanyPatch(BaseModel):
@@ -135,6 +139,7 @@ class CompanyPatch(BaseModel):
     workplace: str | None = None
     photo_enabled: bool | None = None
     kiosk_pin_required: bool | None = None
+    password_login: bool | None = None
 
 
 class ScheduleIn(BaseModel):

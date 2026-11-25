@@ -120,6 +120,10 @@ O aplicativo tem duas áreas: **Meu ponto** (Ponto, Registros, Solicitações, B
 
 Autoaprovação: a Administração só decide o próprio pedido quando ninguém mais na empresa poderia decidi-lo, com justificativa obrigatória (fica como `self_approve` na auditoria).
 
+## Login com Google
+
+"Entrar com Google" aparece na tela de login quando `GOOGLE_CLIENT_ID` está no `.env` (ID do cliente OAuth do tipo Aplicativo da Web, criado no Google Cloud Console com a origem `https://<DOMAIN>` autorizada; não é segredo). Não há cadastro aberto: entra quem a empresa cadastrou com o mesmo e-mail, ou quem vinculou outra conta Google em Minha conta. Na primeira entrada a conta Google fica vinculada ao cadastro. Quem entra pelo Google não tem senha temporária a trocar nem 2FA do app (vale o da conta Google). Em Empresa > Configurações a Administração pode desligar o login por senha (só depois de vincular a própria conta Google). A sessão usa um cookie HttpOnly para a renovação; o aparelho guarda só o token de acesso. As páginas `/privacidade` e `/termos` (exigidas pelo Google) usam `DEV_NAME` e `DEV_EMAIL` do `.env` e precisam de revisão jurídica antes da produção.
+
 ## Editar e excluir cadastros
 
 - **Pessoas:** "Editar dados" (nome, e-mail, CPF, cargo). O CPF só muda enquanto a pessoa não tem marcações; nome e CPF alterados vão para o REP-P (tipo 5). "Excluir cadastro" só vale para quem nunca teve marcações, ajustes, ausências, banco de horas ou fotos (cadastro por engano; gera o evento de exclusão tipo 5). Quem já trabalhou é **desativado**, o que mantém o histórico.

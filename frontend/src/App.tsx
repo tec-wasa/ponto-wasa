@@ -7,6 +7,7 @@ import Cadastros, { Empresa } from "./pages/Admin";
 import Approvals from "./pages/Approvals";
 import MyBank, { TeamBank } from "./pages/Bank";
 import Diagnostic from "./pages/Diagnostic";
+import { Privacy, Terms } from "./pages/Legal";
 import Login from "./pages/Login";
 import Mirror from "./pages/Mirror";
 import More from "./pages/More";
@@ -126,6 +127,8 @@ export default function App() {
     return (
       <Routes>
         <Route path="/diagnostico" element={<Diagnostic />} />
+        <Route path="/privacidade" element={<Privacy />} />
+        <Route path="/termos" element={<Terms />} />
         <Route path="*" element={<Login />} />
       </Routes>
     );
@@ -149,7 +152,7 @@ export default function App() {
   const { mine, mgmt } = areaItems(can);
   const both = mine.length > 0 && mgmt.length > 0;
   const path = location.pathname;
-  const neutral = ["/mais", "/conta", "/diagnostico"].includes(path);
+  const neutral = ["/mais", "/conta", "/diagnostico", "/privacidade", "/termos"].includes(path);
   const area: "mine" | "mgmt" = mine.length === 0 ? "mgmt" : mgmt.length === 0 ? "mine"
     : neutral ? lastArea.current : path.startsWith("/gestao") ? "mgmt" : "mine";
   lastArea.current = area;
@@ -188,6 +191,8 @@ export default function App() {
           {mgmt.some((i) => i.to === "/gestao/empresa") && <Route path="/gestao/empresa" element={<Empresa />} />}
           <Route path="/conta" element={<Account />} />
           <Route path="/diagnostico" element={<Diagnostic />} />
+          <Route path="/privacidade" element={<Privacy />} />
+          <Route path="/termos" element={<Terms />} />
           <Route path="/mais" element={<More items={items.filter((i) => !tabs.includes(i))} area={area} both={both} onLogout={logout} />} />
           {/* endereços antigos */}
           <Route path="/espelho" element={<Navigate to={punches ? "/registros" : "/gestao/espelhos"} replace />} />

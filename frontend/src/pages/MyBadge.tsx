@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
+import { useAuth } from "../auth";
 import { api } from "../api";
 
 interface Badge { employee_code: string; has_pin: boolean; pin_required: boolean }
@@ -47,6 +48,8 @@ function BadgeScreen({ onClose }: { onClose: () => void }) {
 
 /** Minha conta: código interno, PIN e QR do crachá para a Central do Ponto. */
 export default function MyBadge() {
+  const { user } = useAuth();
+  const viaGoogle = user?.login_method === "google"; // quem entrou pelo Google não tem senha do app para confirmar
   const [badge, setBadge] = useState<Badge | null>(null);
   const [show, setShow] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
@@ -63,7 +66,7 @@ export default function MyBadge() {
     if (form.pin !== form.again) return setMsg({ type: "error", text: "A confirmação não é igual ao PIN" });
     setBusy(true); setMsg(null);
     try {
-      await api("/auth/pin", { method: "POST", body: { password: form.password, pin: form.pin } });
+      await api("/auth/pin", { method: "POST", body: { password: viaGoogle ? undefined : form.password, pin: form.pin } });
       setForm({ password: "", pin: "", again: "" });
       setOpen(false);
       setMsg({ type: "ok", text: "PIN salvo." });
@@ -97,7 +100,9 @@ export default function MyBadge() {
         <form onSubmit={save} style={{ marginTop: 12 }}>
           <label>PIN (4 a 6 dígitos)<input type="password" inputMode="numeric" pattern="\d{4,6}" minLength={4} maxLength={6} required autoComplete="off" value={form.pin} onChange={(e) => setForm({ ...form, pin: e.target.value })} /></label>
           <label>Repita o PIN<input type="password" inputMode="numeric" pattern="\d{4,6}" minLength={4} maxLength={6} required autoComplete="off" value={form.again} onChange={(e) => setForm({ ...form, again: e.target.value })} /></label>
-          <label>Sua senha atual<input type="password" autoComplete="current-password" required value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} /></label>
+          {viaGoogle
+            ? <p className="muted small">Você entrou com o Google: por segurança, a troca do PIN só vale nos primeiros 15 minutos depois de entrar.</p>
+            : <label>Sua senha atual<input type="password" autoComplete="current-password" required value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} /></label>}
           <p className="muted small">Sem sequências óbvias (1234, 0000). Pedimos a senha para que quem pegar seu celular aberto não troque o PIN.</p>
           <button className="primary" style={{ width: "100%" }} disabled={busy}>{busy ? "Salvando…" : "Salvar PIN"}</button>
         </form>

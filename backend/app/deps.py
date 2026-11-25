@@ -11,7 +11,7 @@ _bearer = HTTPBearer(auto_error=False)
 
 # Enquanto a conta tem uma pendência de segurança, só estas rotas funcionam (o suficiente para resolvê-la).
 ALLOWED_WHEN_RESTRICTED = {
-    "/api/auth/me", "/api/auth/change-password", "/api/auth/2fa", "/api/auth/2fa/setup", "/api/auth/2fa/enable",
+    "/api/auth/me", "/api/auth/change-password", "/api/auth/2fa", "/api/auth/2fa/setup", "/api/auth/2fa/enable", "/api/auth/logout",
 }
 RESTRICTION_MESSAGE = {
     "password_change_required": "Troque a senha temporária para continuar",
@@ -19,7 +19,11 @@ RESTRICTION_MESSAGE = {
 }
 
 
-def restriction_of(user: User) -> str | None:
+def restriction_of(user: User, amr: str = "pwd") -> str | None:
+    """Pendências de quem entrou com senha. Quem entrou pelo Google não usa a senha do app e já passou pela
+    verificação da própria conta Google: não há senha temporária a trocar nem 2FA do app a exigir."""
+    if amr != "pwd":
+        return None
     if user.must_change_password:
         return "password_change_required"
     if permissions.requires_2fa(user) and not user.totp_enabled:
@@ -37,7 +41,8 @@ def get_current_user(
     # A versão do token precisa bater: trocar senha, redefinir ou mudar o 2FA derruba as sessões anteriores.
     if user is None or not user.active or not user.app_access or decoded[1] != user.token_version:
         raise HTTPException(401, "Não autenticado")
-    restriction = restriction_of(user)
+    request.state.amr, request.state.token_iat = decoded[2], decoded[3]
+    restriction = restriction_of(user, decoded[2])
     if restriction and request.url.path not in ALLOWED_WHEN_RESTRICTED:
         raise HTTPException(403, {"code": restriction, "message": RESTRICTION_MESSAGE[restriction]})
     return user

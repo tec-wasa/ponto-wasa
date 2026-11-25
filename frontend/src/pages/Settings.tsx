@@ -1,12 +1,14 @@
 import { useState, type FormEvent } from "react";
 import { api } from "../api";
 import { useAuth } from "../auth";
+import { useConfig } from "../google";
 
 type Notice = { type: "ok" | "error"; text: string } | null;
 
 /** Gestão > Empresa > Configurações (só a Administração): dados da empresa e regras que valem para todos. */
 export default function Settings() {
-  const { company, reload } = useAuth();
+  const { company, reload, user } = useAuth();
+  const config = useConfig();
   const [msg, setMsg] = useState<Notice>(null);
   const c = company!;
 
@@ -38,6 +40,24 @@ export default function Settings() {
           <span>Permitir foto na batida pelo aplicativo</span>
         </label>
       </section>
+
+      {config?.google_client_id && (
+        <section className="card" aria-labelledby="h-login">
+          <h2 id="h-login" className="section-title">Login</h2>
+          <p className="muted small">
+            Todos podem usar “Entrar com Google” (com a conta do e-mail cadastrado, ou vinculando outra em Minha conta).
+            Desligue a senha para aceitar só o Google; quem ainda não tem conta Google continua sem acesso até vincular uma.
+          </p>
+          <label className="check">
+            <input type="checkbox" checked={c.password_login !== false}
+              onChange={(e) => save({ password_login: e.target.checked }, e.target.checked ? "Login com e-mail e senha permitido." : "Agora só se entra com o Google.")} />
+            <span>Permitir também entrar com e-mail e senha</span>
+          </label>
+          {c.password_login !== false && !user?.google_linked && (
+            <p className="muted small" style={{ margin: "8px 0 0" }}>Para poder desligar a senha, vincule antes a sua conta Google em Minha conta.</p>
+          )}
+        </section>
+      )}
 
       <section className="card" aria-labelledby="h-pin">
         <h2 id="h-pin" className="section-title">Central do Ponto</h2>

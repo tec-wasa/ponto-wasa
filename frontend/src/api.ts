@@ -1,9 +1,11 @@
 const BASE = "/api";
 const KEY = "ponto.tokens";
 
+/** Só o token de acesso (curto) fica no aparelho; o de renovação vive num cookie HttpOnly que scripts não leem.
+ * `refresh` só existe em sessões abertas antes dessa mudança: é usado uma vez para migrar e some. */
 interface Tokens {
   access: string;
-  refresh: string;
+  refresh?: string;
 }
 
 export class ApiError extends Error {
@@ -33,6 +35,7 @@ async function send(path: string, method: string, body: unknown, token?: string)
   try {
     return await fetch(BASE + path, {
       method,
+      credentials: "same-origin",
       headers: {
         ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -44,14 +47,20 @@ async function send(path: string, method: string, body: unknown, token?: string)
   }
 }
 
+let refreshing: Promise<boolean> | null = null;
+
+/** Renova a sessão pelo cookie HttpOnly (várias chamadas ao mesmo tempo esperam a mesma renovação). */
 async function tryRefresh(): Promise<boolean> {
   const t = getTokens();
   if (!t) return false;
-  const res = await send("/auth/refresh", "POST", { refresh_token: t.refresh }).catch(() => null);
-  if (!res?.ok) return false;
-  const j = await res.json();
-  setTokens({ access: j.access_token, refresh: j.refresh_token });
-  return true;
+  refreshing ??= (async () => {
+    const res = await send("/auth/refresh", "POST", t.refresh ? { refresh_token: t.refresh } : undefined).catch(() => null);
+    if (!res?.ok) return false;
+    const j = await res.json();
+    setTokens({ access: j.access_token });
+    return true;
+  })().finally(() => { refreshing = null; });
+  return refreshing;
 }
 
 function errorMessage(detail: unknown, status: number): string {
@@ -64,12 +73,13 @@ function errorMessage(detail: unknown, status: number): string {
 export async function api<T>(path: string, opts: { method?: string; body?: unknown } = {}): Promise<T> {
   const method = opts.method ?? "GET";
   let res = await send(path, method, opts.body, getTokens()?.access);
-  if (res.status === 401 && path !== "/auth/login" && (await tryRefresh())) {
+  const isLogin = path === "/auth/login" || path === "/auth/google";
+  if (res.status === 401 && !isLogin && (await tryRefresh())) {
     res = await send(path, method, opts.body, getTokens()?.access);
   }
   if (!res.ok) {
     const j = await res.json().catch(() => ({}));
-    if (res.status === 401 && path !== "/auth/login") setTokens(null);
+    if (res.status === 401 && !isLogin) setTokens(null);
     const code = j.detail && typeof j.detail === "object" && "code" in j.detail ? String(j.detail.code) : undefined;
     if (res.status === 403 && (code === "password_change_required" || code === "two_factor_required")) {
       window.dispatchEvent(new Event("ponto:restricted")); // a conta tem uma pendência de segurança: o app reabre a tela certa

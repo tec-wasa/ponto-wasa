@@ -46,7 +46,8 @@ class Company(Base):
     timezone: Mapped[str] = mapped_column(String(64), default="America/Sao_Paulo")
     workplace: Mapped[str | None] = mapped_column(String(300), default=None)  # local de prestação do serviço
     photo_enabled: Mapped[bool] = mapped_column(Boolean, default=False)  # foto opcional na batida (consentimento por pessoa)
-    kiosk_pin_required: Mapped[bool] = mapped_column(Boolean, default=False)  # a Central pede o PIN (configurável; padrão: não)
+    kiosk_pin_required: Mapped[bool] = mapped_column(Boolean, default=False)
+    password_login: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())  # False = só "Entrar com Google"  # a Central pede o PIN (configurável; padrão: não)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 
@@ -87,6 +88,7 @@ class User(Base):
     roles: Mapped[str] = mapped_column(String(60), default="", server_default="")  # funções de gestão acumuláveis, ex.: "admin,hr,manager"
     tracks_time: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())  # False = só gere, não bate ponto
     app_access: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())  # False = só bate ponto na Central, sem login
+    google_sub: Mapped[str | None] = mapped_column(String(64), unique=True, index=True, default=None)  # conta Google vinculada
     manager_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), default=None)
     schedule_id: Mapped[int | None] = mapped_column(ForeignKey("schedules.id"), default=None)
     active: Mapped[bool] = mapped_column(Boolean, default=True)

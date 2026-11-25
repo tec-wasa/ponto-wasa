@@ -15,6 +15,8 @@ interface AuthState {
   restriction: string | null;
   loading: boolean;
   login: (email: string, password: string, otp?: string) => Promise<void>;
+  /** Entra com a credencial devolvida pelo botão "Entrar com Google". */
+  loginGoogle: (credential: string) => Promise<void>;
   logout: () => void;
   reload: () => Promise<void>;
   /** A pessoa pode fazer esta ação? (única regra de exibição; o servidor confere de novo) */
@@ -42,7 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     try {
       const [u, tf] = await Promise.all([api<User>("/auth/me"), api<TwoFactorStatus>("/auth/2fa")]);
-      const restricted = u.must_change_password || (tf.required && !tf.enabled);
+      const restricted = u.restriction !== undefined ? !!u.restriction : u.must_change_password || (tf.required && !tf.enabled);
       // Com pendência, o servidor só libera a conta. Tudo é gravado junto: um estado "sem pendência, mas sem
       // empresa" derrubaria as telas que assumem a empresa carregada.
       const c = restricted ? null : await api<Company>("/company");
@@ -66,7 +68,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (email: string, password: string, otp?: string) => {
       const t = await api<TokenPair>("/auth/login", { method: "POST", body: { email, password, otp: otp || undefined } });
       clearApiCache(); // nada de dados em cache de outro usuário no mesmo aparelho
-      setTokens({ access: t.access_token, refresh: t.refresh_token });
+      setTokens({ access: t.access_token });
+      await reload();
+    },
+    [reload],
+  );
+
+  const loginGoogle = useCallback(
+    async (credential: string) => {
+      const t = await api<TokenPair>("/auth/google", { method: "POST", body: { credential } });
+      clearApiCache();
+      setTokens({ access: t.access_token });
       await reload();
     },
     [reload],
@@ -74,7 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const applyTokens = useCallback(
     async (t: TokenPair) => {
-      setTokens({ access: t.access_token, refresh: t.refresh_token });
+      setTokens({ access: t.access_token });
       clearApiCache();
       await reload();
     },
@@ -82,6 +94,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const logout = useCallback(() => {
+    void api("/auth/logout", { method: "POST" }).catch(() => undefined); // apaga o cookie da sessão
     setTokens(null);
     clearApiCache();
     setUser(null);
@@ -89,18 +102,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setTwoFactor(null);
   }, []);
 
-  const restriction = user?.must_change_password
-    ? "password_change_required"
-    : twoFactor && twoFactor.required && !twoFactor.enabled
-      ? "two_factor_required"
-      : null;
+  const restriction = user?.restriction !== undefined
+    ? user.restriction ?? null // o servidor sabe como a pessoa entrou (pelo Google não há senha temporária nem 2FA do app)
+    : user?.must_change_password
+      ? "password_change_required"
+      : twoFactor && twoFactor.required && !twoFactor.enabled
+        ? "two_factor_required"
+        : null;
 
   const can = useCallback((p: Permission) => !!user?.permissions?.includes(p), [user]);
   const manages = !!user?.permissions?.some((p) => p !== "punch");
 
   const value = useMemo(
-    () => ({ user, company, twoFactor, restriction, loading, login, logout, reload, applyTokens, can, manages }),
-    [user, company, twoFactor, restriction, loading, login, logout, reload, applyTokens, can, manages],
+    () => ({ user, company, twoFactor, restriction, loading, login, loginGoogle, logout, reload, applyTokens, can, manages }),
+    [user, company, twoFactor, restriction, loading, login, loginGoogle, logout, reload, applyTokens, can, manages],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

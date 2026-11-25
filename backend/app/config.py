@@ -54,6 +54,8 @@ class Settings(BaseSettings):
     max_clock_drift_seconds: float = 30.0
 
     # Verificação em duas etapas
+    google_client_id: str = ""  # ID do cliente OAuth (tipo Aplicativo da Web) do Google Cloud; vazio = sem "Entrar com Google"
+    cookie_secure: bool = True  # cookie da sessão só em HTTPS (desligar só em testes/desenvolvimento sem HTTPS)
     totp_key: str = ""  # chave que cifra os segredos TOTP (padrão: derivada de SECRET_KEY)
     require_2fa_roles: str = ""  # perfis obrigados a ter 2FA, separados por vírgula (ex.: "hr,admin")
 
