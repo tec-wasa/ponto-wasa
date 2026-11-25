@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { ApiError, api, download } from "../api";
 import { useAuth } from "../auth";
+import PunchImportCard from "./PunchImport";
 import type { ImportResult, Schedule, User } from "../types";
 import { ROLE_LABEL, fmtCpf, initials } from "../util";
 
@@ -364,6 +365,12 @@ export default function People() {
         <details className="fold">
           <summary>Importar várias pessoas por CSV</summary>
           <ImportCard onDone={load} />
+        </details>
+      )}
+      {can("closing.manage") && (
+        <details className="fold">
+          <summary>Importar marcações de outro sistema de ponto (CSV)</summary>
+          <PunchImportCard />
         </details>
       )}
     </>

@@ -805,6 +805,48 @@ export const TOPICS: Topic[] = [
     ],
   },
   {
+    id: "importar-marcacoes",
+    group: "Cadastros",
+    title: "Importar marcações de outro sistema de ponto",
+    who: "RH e Administração",
+    need: ["closing.manage"],
+    where: { path: "/gestao/cadastros", label: "Cadastros" },
+    summary: "Trazer as batidas de um período em que a empresa ainda usava outro sistema, por planilha CSV.",
+    blocks: [
+      {
+        text: "As batidas entram como **inclusões aprovadas** (tratamento), com o motivo que você escrever. Elas aparecem tratadas no Espelho e na folha e vão para o AEJ. Pela Portaria 671, uma batida feita em outro relógio não vira marcação original deste ponto: **guarde o AFD e os relatórios do sistema anterior**, que continuam sendo os registros originais desses dias.",
+      },
+      {
+        h: "A planilha",
+        list: [
+          "Uma linha por pessoa e dia, separada por ponto e vírgula (Excel em CSV serve).",
+          "Colunas obrigatórias: **cpf**, **data** (dd/mm/aaaa) e **batida_1**, **batida_2**, **batida_3**, **batida_4** (HH:MM). Também vale uma coluna **batidas** com os horários separados por espaço.",
+          "Outras colunas (nome, ocorrência, totais) são ignoradas. Linhas sem batidas (folga, feriado, férias) também.",
+          "A ordem define o tipo: 1ª entrada, 2ª intervalo, 3ª retorno, 4ª saída. Com 2 batidas: entrada e saída.",
+        ],
+      },
+      {
+        h: "Importar",
+        steps: [
+          "Gestão > Cadastros > aba **Pessoas** > **Importar marcações de outro sistema de ponto (CSV)**.",
+          "Confira o **Motivo** (ex.: Migração do sistema de ponto anterior). Ele vai em cada inclusão e na auditoria.",
+          "Escolha o arquivo e toque em **Validar arquivo**. Nada é gravado: a tela mostra quantas marcações entram por pessoa, os problemas, os avisos e os dias que ficam de fora.",
+          "Corrija no Excel as linhas com problema e valide de novo. A importação grava tudo ou nada.",
+          "Toque em **Importar N marcações**. Depois confira o Espelho de algumas pessoas em Gestão > Tratamento.",
+        ],
+      },
+      {
+        list: [
+          "**Dias que já têm marcações no app ficam de fora**, para não duplicar. Importar o mesmo arquivo duas vezes não duplica nada.",
+          "Pessoas são encontradas pelo **CPF**: cadastre todas antes. O mês não pode estar fechado.",
+          "Férias e atestados se lançam em **Ausências**; o saldo do banco de horas anterior, em **Banco de horas** (lançamento manual).",
+          "Errou? Em **Importações feitas**, toque em **Desfazer importação** > **Confirmar**: todas as inclusões daquela importação deixam de valer, com a trilha na auditoria.",
+        ],
+      },
+      { warn: "A planilha tem CPFs e horários de trabalho: guarde-a em local seguro e apague as cópias depois de importar." },
+    ],
+  },
+  {
     id: "jornadas",
     group: "Cadastros",
     title: "Jornadas de trabalho",
