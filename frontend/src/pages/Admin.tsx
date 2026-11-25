@@ -196,8 +196,9 @@ function Users({ readOnly }: { readOnly: boolean }) {
     }
   }
 
-  const roles = user?.role === "admin" ? ["employee", "manager", "hr", "admin", "auditor"] : ["employee", "manager"];
-  const managers = users.filter((u) => u.role === "manager" || u.role === "hr" || u.role === "admin");
+  // Só dois perfis de uso: colaborador e administrador (master: gestão, RH, aprovações, centrais). Auditor = leitura para a fiscalização.
+  const roles = user?.role === "admin" ? ["employee", "admin", "auditor"] : ["employee"];
+  const managers = users.filter((u) => u.active && ["admin", "hr", "manager"].includes(u.role));
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
     return users.filter((u) => (showInactive || u.active) && (!q || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)));
