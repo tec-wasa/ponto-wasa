@@ -210,3 +210,15 @@ def test_import_time_is_reasonable(client, world):
     assert r.json()["created"] == 8
     assert elapsed < 30  # 8 hashes de senha (argon2), com folga para máquina carregada; o limite de 200 linhas vem daí
     print(f"\nimportação de 8 linhas: {elapsed:.2f}s")
+
+
+def test_blank_rows_from_excel_are_ignored(client, world):
+    text = (HEADER + "\n"
+            f"Uma Pessoa;uma@a.com;{cpf(710000090)};;;;;\n"
+            ";;;;;;;;\n"
+            f"Outra Pessoa;outra@a.com;{cpf(710000091)};;;;;\n"
+            ";;;;;;;;\n;;;;;;;;\n\n")
+    body = post(client, world["admin"], text).json()
+    assert body["errors"] == [] and body["valid"] == 2 and body["total"] == 2
+    bad = post(client, world["admin"], HEADER + "\n;;;;;;;;\n" + "Sem Cpf;sem@a.com;;;;;;\n").json()
+    assert [(e["line"], e["field"]) for e in bad["errors"]] == [(3, "cpf")]  # a linha em branco conta na numeração

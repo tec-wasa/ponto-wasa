@@ -99,12 +99,21 @@ def _parse_date(text: str) -> date | None:
 
 def parse(db: Session, company_id: int, text: str, allowed_roles: tuple[str, ...]) -> ParseResult:
     result = ParseResult()
-    lines = [ln for ln in text.splitlines() if ln.strip()]
-    if not lines:
+    # Linhas em branco, inclusive as que o Excel salva só com separadores (";;;;;"), são ignoradas; a numeração das
+    # linhas continua a do arquivo, para o erro apontar a linha certa.
+    all_lines = text.splitlines()
+    first = next((ln for ln in all_lines if ln.strip()), None)
+    if first is None:
         result.errors.append(RowError(1, "arquivo", "O arquivo está vazio"))
         return result
-    delimiter = ";" if lines[0].count(";") >= lines[0].count(",") else ","
-    reader = list(csv.reader(lines, delimiter=delimiter))
+    delimiter = ";" if first.count(";") >= first.count(",") else ","
+    numbered = [(n, cells) for n, cells in enumerate(csv.reader(all_lines, delimiter=delimiter), start=1)
+                if any(c.strip() for c in cells)]
+    if not numbered:
+        result.errors.append(RowError(1, "arquivo", "O arquivo está vazio"))
+        return result
+    reader = [cells for _, cells in numbered]
+    line_of = [n for n, _ in numbered]
 
     header = [ALIASES.get(_norm(h)) for h in reader[0]]
     missing = [f for f in REQUIRED if f not in header]
@@ -132,7 +141,7 @@ def parse(db: Session, company_id: int, text: str, allowed_roles: tuple[str, ...
     parsed: list[ParsedRow] = []  # todas as linhas, mesmo as com erro: o gestor é validado em todas
 
     for offset, raw in enumerate(data):
-        line = offset + 2  # a linha 1 é o cabeçalho
+        line = line_of[offset + 1]  # número da linha no arquivo (a primeira com conteúdo é o cabeçalho)
         cells = {header[i]: (raw[i].strip() if i < len(raw) else "") for i in range(len(header)) if header[i]}
         row = ParsedRow(line=line)
 
