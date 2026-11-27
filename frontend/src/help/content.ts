@@ -633,6 +633,49 @@ export const TOPICS: Topic[] = [
     ],
   },
   {
+    id: "inconsistencias",
+    group: "Gestão do dia a dia",
+    title: "Inconsistências: o que a CLT pede atenção",
+    who: "Gestor, RH, Administração e Auditoria",
+    need: ["team.view"],
+    where: { path: "/gestao/inconsistencias", label: "Inconsistências" },
+    summary: "Lista do mês com faltas, saídas não registradas, intervalo curto, menos de 11 h entre jornadas, 7º dia sem folga, horas extras demais e ponto britânico.",
+    blocks: [
+      {
+        text: "O aplicativo confere o espelho de cada pessoa (com as correções e ausências já aprovadas) e aponta os dias que merecem atenção antes do fechamento. Nada é gravado no ponto: a lista é recalculada a cada consulta.",
+      },
+      {
+        h: "O que é apontado",
+        list: [
+          "**Falta**: dia de trabalho previsto sem marcação nem justificativa.",
+          "**Saída não registrada**: uma entrada ficou sem a saída.",
+          "**Intervalo insuficiente** (CLT art. 71): menos de 1 h de intervalo em jornada acima de 6 h, ou menos de 15 min em jornada acima de 4 h.",
+          "**Mais de 6 h sem intervalo** (art. 71): um trecho seguido de trabalho acima de 6 h, mesmo com intervalo em outro momento.",
+          "**Mais de 2 h extras no dia** (art. 59): só em dias de trabalho previsto.",
+          "**Menos de 11 h entre jornadas** (art. 66): da última saída até a primeira entrada seguinte.",
+          "**7º dia seguido sem folga** (art. 67): a partir do 7º dia seguido com marcação.",
+          "**Ponto britânico** (Súmula 338 do TST): 5 dias seguidos com exatamente os mesmos horários, o que tira a credibilidade do controle. Aparece uma vez por sequência, no primeiro dia dela.",
+        ],
+      },
+      {
+        h: "Tratar",
+        steps: [
+          "Gestão > **Inconsistências**. Escolha o mês; filtre por pessoa ou toque num tipo para ver só ele.",
+          "Para corrigir o ponto, toque em **Abrir no tratamento**: o dia já abre na tela de Tratamento.",
+          "Quando não há o que corrigir (ex.: hora extra autorizada), toque em **Marcar como resolvida**, escolha ou escreva a observação e confirme. Ela some da lista.",
+          "Para ver de novo, marque **Mostrar as resolvidas**; **Reabrir** devolve a inconsistência para a lista.",
+          "**Baixar planilha (CSV)** exporta o que está na tela, para abrir no Excel.",
+        ],
+      },
+      {
+        tip: "Se o ponto for corrigido depois, a inconsistência some sozinha. Marcar como resolvida não muda o cálculo: só registra que a gestão viu e tratou (fica na auditoria).",
+      },
+      {
+        warn: "O gestor vê e resolve só a própria equipe; ninguém resolve as próprias inconsistências. A Auditoria só consulta.",
+      },
+    ],
+  },
+  {
     id: "banco-equipe",
     group: "Gestão do dia a dia",
     title: "Banco de horas da equipe",
@@ -727,6 +770,7 @@ export const TOPICS: Topic[] = [
           "No **Painel**, veja os quadros **Faltas**, **A tratar** e **Aprovações** do mês.",
           "Em **Aprovações**, decida todos os pedidos pendentes (o fechamento exige zero pendências).",
           "Em **Tratamento**, passe pessoa por pessoa na visão **Pendências**: inclua as batidas esquecidas, desconsidere as erradas e justifique as faltas que tiverem documento.",
+          "Em **Inconsistências**, zere a lista do mês: corrija no Tratamento ou marque como resolvida (hora extra autorizada, por exemplo).",
           "Em **Ausências**, confira férias, licenças e atestados do mês.",
           "Em **Espelhos**, gere **Folhas de ponto de todos** e colha a assinatura de cada pessoa (e do empregador).",
           "Em **Relatórios**, baixe o **Fechamento mensal** para a folha de pagamento.",

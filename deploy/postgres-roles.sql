@@ -33,5 +33,6 @@ GRANT SELECT, INSERT ON punches, arp_events, audit_log, hour_bank_entries TO pon
 -- ausências e banco de horas continuam sem DELETE).
 GRANT DELETE ON users, schedules, kiosks, kiosk_tickets TO ponto_app;
 GRANT SELECT, INSERT, UPDATE, DELETE ON holidays TO ponto_app;  -- feriados estaduais/municipais da empresa
+GRANT SELECT, INSERT, DELETE ON inconsistency_resolutions TO ponto_app;  -- "resolvido" das inconsistências (reabrir apaga)
 
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO ponto_app;

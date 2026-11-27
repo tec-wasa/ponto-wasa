@@ -9,6 +9,7 @@ import MyBank, { TeamBank } from "./pages/Bank";
 import Diagnostic from "./pages/Diagnostic";
 import { Privacy, Terms } from "./pages/Legal";
 import Help from "./pages/Help";
+import Inconsistencies from "./pages/Inconsistencies";
 import Login from "./pages/Login";
 import Mirror from "./pages/Mirror";
 import More from "./pages/More";
@@ -73,6 +74,7 @@ export function areaItems(can: (p: Permission) => boolean) {
     ...(can("approvals") ? [{ to: "/gestao/aprovacoes", label: "Aprovações", hint: "Ajustes e ausências aguardando decisão", icon: <IconClock /> }] : []),
     ...(team ? [{ to: "/gestao/espelhos", label: "Espelhos", hint: "Espelho de ponto de cada pessoa", icon: <IconList /> }] : []),
     ...(can("approvals") ? [{ to: "/gestao/tratamento", label: "Tratamento", hint: "Corrigir o ponto do mês de cada pessoa" }] : []),
+    ...(team ? [{ to: "/gestao/inconsistencias", label: "Inconsistências", hint: "Falta, intervalo, 11 h entre jornadas, 7º dia, horas extras" }] : []),
     ...(team ? [{ to: "/gestao/banco", label: "Banco de horas", hint: "Saldos e lançamentos" }] : []),
     ...(team ? [{ to: "/gestao/ausencias", label: "Ausências", hint: "Atestados, férias, licenças e afastamentos" }] : []),
     ...(team ? [{ to: "/gestao/relatorios", label: "Relatórios", hint: "Fechamento mensal, banco de horas, ausências", icon: <IconBars /> }] : []),
@@ -190,6 +192,7 @@ export default function App() {
           {can("approvals") && <Route path="/gestao/aprovacoes" element={<Approvals />} />}
           {can("team.view") && <Route path="/gestao/espelhos" element={<Mirror mode="team" />} />}
           {can("approvals") && <Route path="/gestao/tratamento" element={<Treatment />} />}
+          {can("team.view") && <Route path="/gestao/inconsistencias" element={<Inconsistencies />} />}
           {can("team.view") && <Route path="/gestao/banco" element={<TeamBank />} />}
           {can("team.view") && <Route path="/gestao/ausencias" element={<TeamAbsences />} />}
           {can("team.view") && <Route path="/gestao/relatorios" element={<Reports />} />}

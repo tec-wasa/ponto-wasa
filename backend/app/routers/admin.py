@@ -20,6 +20,7 @@ from ..models import (
     Closing,
     Company,
     HourBankEntry,
+    InconsistencyResolution,
     KioskTicket,
     Punch,
     PunchPhoto,
@@ -273,6 +274,8 @@ def delete_user(user_id: int, request: Request, actor: User = Depends(require("p
         raise HTTPException(409, "Esta pessoa é gestora de outras. Troque o gestor delas antes de excluir.")
     snapshot = {"name": user.name, "email": user.email, "role": user.role}
     db.query(KioskTicket).filter(KioskTicket.user_id == user.id).delete()
+    db.query(InconsistencyResolution).filter(InconsistencyResolution.user_id == user.id).delete()  # só "resolvido" de faltas
+    db.query(InconsistencyResolution).filter(InconsistencyResolution.resolved_by == user.id).update({"resolved_by": None})
     if arp.in_rep(user):  # quem já foi desativado (ou não registra ponto) já está fora do REP-P
         arp.record_employee(db, db.get(Company, actor.company_id), "E", user, actor)  # tipo 5: exclusão
     audit.log(db, actor, "delete", "user", user.id, before=snapshot, ip=client_ip(request))

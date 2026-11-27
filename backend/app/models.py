@@ -296,6 +296,24 @@ class Closing(Base):
     closed_at: Mapped[datetime | None] = mapped_column(DateTime, default=None)
 
 
+class InconsistencyResolution(Base):
+    """Inconsistência de um dia marcada como resolvida pela gestão (com observação).
+
+    A inconsistência em si não é guardada: é recalculada do espelho a cada consulta. Aqui fica só a decisão
+    "vista e tratada", que pode ser desfeita (reabrir apaga a linha; a trilha fica na auditoria).
+    """
+    __tablename__ = "inconsistency_resolutions"
+    __table_args__ = (UniqueConstraint("user_id", "date", "kind"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    day: Mapped[date] = mapped_column("date", Date)
+    kind: Mapped[str] = mapped_column(String(20))
+    note: Mapped[str] = mapped_column(Text)
+    resolved_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), default=None)
+    resolved_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
 class AuditLog(Base):
     """Trilha de auditoria append-only."""
     __tablename__ = "audit_log"

@@ -59,6 +59,12 @@ class DayResult:
     holiday: str | None = None  # nome do feriado do dia (jornada prevista zero)
     punches: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
+    # Detalhe dos pares do dia (horário local), usado pelas inconsistências: primeira entrada, última saída,
+    # soma dos intervalos entre os pares e o maior trecho trabalhado sem parar.
+    first_in: datetime | None = None
+    last_out: datetime | None = None
+    break_minutes: int = 0
+    longest_stretch: int = 0
 
 
 def compute_month(
@@ -131,6 +137,12 @@ def compute_month(
         res.worked = sum(int((b - a).total_seconds() // 60) for a, b in day_pairs)
         res.night_minutes = sum(night_overlap_minutes(a, b) for a, b in day_pairs)
         res.reduced_minutes = reduced_duration(res.worked, res.night_minutes)
+        if day_pairs:
+            res.first_in, res.last_out = day_pairs[0][0], day_pairs[-1][1]
+            res.break_minutes = sum(
+                int((day_pairs[i + 1][0] - day_pairs[i][1]).total_seconds() // 60) for i in range(len(day_pairs) - 1)
+            )
+            res.longest_stretch = max(int((b - a).total_seconds() // 60) for a, b in day_pairs)
 
         if start and d < start and not res.punches:
             res.status, res.expected = "anterior", 0

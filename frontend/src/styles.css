@@ -284,6 +284,8 @@ th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--bord
 .seg { display: flex; gap: 4px; padding: 4px; margin: 0 0 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 999px; }
 .seg button { flex: 1; min-height: 40px; padding: 0 8px; border: 0; border-radius: 999px; background: none; color: var(--text-muted); font-size: 14px; }
 .seg button.on { background: var(--avatar-bg); color: var(--avatar-text); }
+.fchip .count { padding: 1px 7px; border-radius: 999px; background: var(--avatar-bg); color: var(--avatar-text); font-size: 12px; }
+.fchip.on .count { background: var(--accent-on); color: var(--accent); }
 .seg .count { margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: var(--danger); color: var(--surface); font-size: 12px; }
 .day-row { border-bottom: 1px solid var(--border); }
 .day-row:last-child { border-bottom: 0; }

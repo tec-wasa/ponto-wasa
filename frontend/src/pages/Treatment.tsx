@@ -48,8 +48,8 @@ export default function Treatment() {
   const [target, setTarget] = useState<number | "">(Number(params.get("user")) || "");
   const [month, setMonth] = useState(params.get("mes") ?? currentMonth(tz));
   const [data, setData] = useState<Data | null>(null);
-  const [view, setView] = useState<"atencao" | "uteis" | "todos">("uteis");
-  const [open, setOpen] = useState<string | null>(null);
+  const [view, setView] = useState<"atencao" | "uteis" | "todos">(params.get("dia") ? "todos" : "uteis");
+  const [open, setOpen] = useState<string | null>(params.get("dia")); // vindo das Inconsistências: abre direto no dia
   const [msg, setMsg] = useState<{ type: "ok" | "error"; text: string } | null>(null);
 
   useEffect(() => {
@@ -66,6 +66,10 @@ export default function Treatment() {
     }
   }, [target, month]);
   useEffect(() => { void load(); }, [load]);
+  const [jump] = useState(params.get("dia"));
+  useEffect(() => {
+    if (jump && data) document.getElementById(`dia-${jump}`)?.scrollIntoView({ block: "center" });
+  }, [jump, data]);
   useEffect(() => { setParams(target ? { user: String(target), mes: month } : {}, { replace: true }); }, [target, month, setParams]);
 
   const shown = useMemo(() => {
@@ -172,7 +176,7 @@ function DayRow({ d, tz, open, onToggle, editable, canJustify, userId, act }: {
   }
 
   return (
-    <details className="day-row" open={open} onToggle={(e) => onToggle(e.currentTarget.open)}>
+    <details className="day-row" id={`dia-${d.date}`} open={open} onToggle={(e) => onToggle(e.currentTarget.open)}>
       <summary>
         <span className="day-date"><b>{num}</b><small>{week}</small></span>
         <span className="day-main">

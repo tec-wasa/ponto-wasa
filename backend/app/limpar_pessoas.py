@@ -18,7 +18,21 @@ from sqlalchemy import create_engine, delete, select, text, update
 from sqlalchemy.orm import Session
 
 from . import immutability
-from .models import Absence, Adjustment, ArpEvent, AuditLog, Closing, HourBankEntry, Kiosk, KioskTicket, NsrCounter, Punch, PunchPhoto, User
+from .models import (
+    Absence,
+    Adjustment,
+    ArpEvent,
+    AuditLog,
+    Closing,
+    HourBankEntry,
+    InconsistencyResolution,
+    Kiosk,
+    KioskTicket,
+    NsrCounter,
+    Punch,
+    PunchPhoto,
+    User,
+)
 from .services.arp import GENESIS, punch_hash
 
 
@@ -89,6 +103,8 @@ def main() -> None:
             conn.execute(update(Absence).where(Absence.created_by.in_(drop_ids)).values(created_by=owner.id))
             conn.execute(update(HourBankEntry).where(HourBankEntry.created_by.in_(drop_ids)).values(created_by=owner.id))
             # histórico das pessoas removidas (filhos antes dos pais)
+            conn.execute(delete(InconsistencyResolution).where(InconsistencyResolution.user_id.in_(drop_ids)))
+            conn.execute(update(InconsistencyResolution).where(InconsistencyResolution.resolved_by.in_(drop_ids)).values(resolved_by=None))
             conn.execute(delete(PunchPhoto).where(PunchPhoto.user_id.in_(drop_ids)))
             conn.execute(delete(Adjustment).where((Adjustment.user_id.in_(drop_ids)) | (Adjustment.target_punch_id.in_(dropped_punches))))
             conn.execute(delete(Absence).where(Absence.user_id.in_(drop_ids)))
