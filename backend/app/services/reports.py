@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from .. import permissions as perm
 from ..models import Absence, AuditLog, Company, Kiosk, Punch, User, utcnow
 from . import absences as absences_svc
-from . import hourbank, mirror, panel
+from . import hourbank, mirror, overtime, panel
 from .layout import latin1_safe
 from .mirror import ABSENCE_LABEL
 from .pdf import NEXT_LINE, _br_date, _fmt_cpf, _hm, _new_pdf
@@ -59,6 +59,50 @@ def monthly(db: Session, company: Company, actor: User, year: int, month: int) -
         "rows": rows,
         "totals": {k: sum(r[k] for r in rows) for k in ("worked", "reduced", "night", "balance", "absences", "justified", "incomplete")},
     }
+
+
+def overtime_report(db: Session, company: Company, actor: User, year: int, month: int) -> dict:
+    """Horas extras pagas do mês, por percentual e por tipo de dia. Quem usa banco de horas vem à parte (vai para o banco)."""
+    zone = ZoneInfo(company.timezone)
+    rule = overtime.company_rule(company)
+    percents = sorted({b[k] for b in rule.values() for k in ("first", "excess")})
+    rows, bank_rows = [], []
+    for u in scope(db, actor):
+        days = mirror.month_days(db, u, company, year, month)
+        if u.hour_bank_enabled:
+            credit = sum(d.balance for d in days if d.balance > 0)
+            if credit:
+                bank_rows.append({"name": u.name, "cpf": u.cpf, "credit": credit})
+            continue
+        ot = overtime.compute(days, rule)
+        rows.append({
+            "name": u.name, "cpf": u.cpf, "job_title": u.job_title or "", "total": ot.total,
+            "by_percent": {p: ot.by_percent.get(p, 0) for p in percents},
+            "by_type": {t: ot.by_type.get(t, 0) for t in overtime.DAY_TYPES},
+            "night": sum(d.night_minutes for d in days),
+        })
+    return {
+        "title": "Horas extras", "month": f"{year:04d}-{month:02d}", "company": company.name, "cnpj": company.cnpj,
+        "issued_at": utcnow().replace(tzinfo=ZoneInfo("UTC")).astimezone(zone).strftime("%d/%m/%Y %H:%M"),
+        "percents": percents, "rule": rule, "rows": rows, "bank_rows": bank_rows,
+        "totals": {
+            "total": sum(r["total"] for r in rows), "night": sum(r["night"] for r in rows),
+            "by_percent": {p: sum(r["by_percent"][p] for r in rows) for p in percents},
+            "by_type": {t: sum(r["by_type"][t] for r in rows) for t in overtime.DAY_TYPES},
+        },
+    }
+
+
+def rule_text(rule: dict) -> str:
+    """A regra em uma linha, para o rodapé do relatório."""
+    out = []
+    for t in overtime.DAY_TYPES:
+        b = rule[t]
+        if b["limit"] is None or b["first"] == b["excess"]:
+            out.append(f"{overtime.DAY_TYPE_LABEL[t]}: {b['first']}%")
+        else:
+            out.append(f"{overtime.DAY_TYPE_LABEL[t]}: primeiras {_hm(b['limit'])} a {b['first']}%, depois {b['excess']}%")
+    return "; ".join(out)
 
 
 def bank_report(db: Session, company: Company, actor: User) -> dict:
@@ -235,6 +279,17 @@ def monthly_csv(d: dict) -> bytes:
     return to_csv(head, rows)
 
 
+def overtime_csv(d: dict) -> bytes:
+    pcts = d["percents"]
+    head = (["Nome", "CPF", "Cargo", "Horas extras (min)", "Horas extras (h:mm)"] + [f"HE {p}% (min)" for p in pcts]
+            + [f"{overtime.DAY_TYPE_LABEL[t]} (min)" for t in overtime.DAY_TYPES] + ["Minutos noturnos"])
+    rows = [[r["name"], _fmt_cpf(r["cpf"]), r["job_title"], r["total"], _hm(r["total"])] + [r["by_percent"][p] for p in pcts]
+            + [r["by_type"][t] for t in overtime.DAY_TYPES] + [r["night"]] for r in d["rows"]]
+    rows += [[r["name"], _fmt_cpf(r["cpf"]), "Banco de horas: crédito do mês (não pago)", r["credit"], _hm(r["credit"])]
+             for r in d["bank_rows"]]
+    return to_csv(head, rows)
+
+
 def bank_csv(d: dict) -> bytes:
     head = ["Nome", "CPF", "Saldo (min)", "Saldo (h:mm)", "Limite (min)", "Em risco de vencer (min)", "Alertas"]
     rows = [[r["name"], _fmt_cpf(r["cpf"]), r["balance"], _hm(r["balance"]), "" if r["limit"] is None else r["limit"], r["at_risk"], " | ".join(r["alerts"])]
@@ -304,6 +359,26 @@ def monthly_pdf(d: dict) -> bytes:
     totals = ("Totais", "", "", _hm(t["worked"]), _hm(t["reduced"]), _hm(t["balance"]), t["absences"], t["justified"], t["incomplete"], "")
     note = ("Consolidado mensal do escopo do emitente, calculado como o Espelho de Ponto (jornada, tolerância legal, hora noturna "
             "reduzida e ausências justificadas). Não substitui o Espelho de Ponto individual (Art. 84), que é o documento oficial.")
+    return _table_pdf(d, f"Competência {m}/{y}", heads, widths, rows, totals, note)
+
+
+def overtime_pdf(d: dict) -> bytes:
+    y, m = d["month"].split("-")
+    pcts = d["percents"]
+    heads = ("Nome", "CPF", "Total") + tuple(f"HE {p}%" for p in pcts) + tuple(overtime.DAY_TYPE_LABEL[t] for t in overtime.DAY_TYPES) + ("Noturnos",)
+    fixed = 62 + 28 + 18 + 18
+    free = 277 - fixed - 18 * 4
+    widths = (62, 28, 18) + tuple(max(14, free // max(1, len(pcts))) for _ in pcts) + (18, 18, 18, 18) + (18,)
+    rows = [(r["name"], _fmt_cpf(r["cpf"]), _hm(r["total"])) + tuple(_hm(r["by_percent"][p]) for p in pcts)
+            + tuple(_hm(r["by_type"][t]) for t in overtime.DAY_TYPES) + (_hm(r["night"]),) for r in d["rows"]]
+    t = d["totals"]
+    totals = ("Totais", "", _hm(t["total"])) + tuple(_hm(t["by_percent"][p]) for p in pcts) + tuple(
+        _hm(t["by_type"][x]) for x in overtime.DAY_TYPES) + (_hm(t["night"]),)
+    bank = ""
+    if d["bank_rows"]:
+        bank = " Usam banco de horas (crédito do mês, não pago): " + "; ".join(f"{r['name']} {_hm(r['credit'])}" for r in d["bank_rows"]) + "."
+    note = ("Hora extra = saldo positivo do dia no Espelho de Ponto (com a tolerância), dividida pelas faixas da empresa: "
+            + rule_text(d["rule"]) + ". Minutos noturnos à parte (adicional noturno)." + bank)
     return _table_pdf(d, f"Competência {m}/{y}", heads, widths, rows, totals, note)
 
 

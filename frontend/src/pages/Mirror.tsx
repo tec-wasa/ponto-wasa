@@ -177,6 +177,12 @@ export default function Mirror({ mode = "self" }: { mode?: "self" | "team" }) {
           <p className="summary-line muted small">
             Faltas <b>{t.absences}</b> · Justificados <b>{t.justified_days}</b> · Incompletos <b>{t.incomplete_days}</b>
           </p>
+          {data?.overtime && data.overtime.total > 0 && (
+            <p className="summary-line muted small" style={{ marginTop: -4 }}>
+              Horas extras <b>{fmtMinutes(data.overtime.total)}</b>
+              {data.overtime.by_percent.map((p) => <span key={p.percent}> · a {p.percent}% <b>{fmtMinutes(p.minutes)}</b></span>)}
+            </p>
+          )}
           <div className="row">
             <button onClick={() => officialPdf("folha")} disabled={pdfBusy}>{pdfBusy ? "Gerando…" : "Folha de ponto (PDF)"}</button>
             <button className="link" onClick={() => officialPdf("detalhado")} disabled={pdfBusy}>Espelho detalhado (com NSR)</button>

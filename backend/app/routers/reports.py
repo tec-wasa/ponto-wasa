@@ -49,6 +49,20 @@ def monthly(
                     actor, db, {"month": month})
 
 
+@router.get("/overtime")
+def overtime_report(
+    request: Request, month: str = Query(..., description="YYYY-MM"), format: str = "csv",
+    actor: User = Depends(require("team.view")), db: Session = Depends(get_db),
+):
+    """Horas extras pagas do mês por colaborador, por percentual e por tipo de dia (quem não usa banco de horas)."""
+    if not re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", month):
+        raise HTTPException(422, "Mês deve estar no formato YYYY-MM")
+    company = db.get(Company, actor.company_id)
+    data = _run(lambda: reports.overtime_report(db, company, actor, int(month[:4]), int(month[5:])))
+    return _deliver("overtime", f"horas-extras-{month}", format, reports.overtime_csv, reports.overtime_pdf, data, request,
+                    actor, db, {"month": month})
+
+
 @router.get("/hour-bank")
 def hour_bank(
     request: Request, format: str = "csv",

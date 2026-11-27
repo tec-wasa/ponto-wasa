@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { api } from "../api";
 import { useAuth } from "../auth";
 import { useConfig } from "../google";
+import type { OvertimeRule } from "../types";
 import Holidays from "./Holidays";
 
 type Notice = { type: "ok" | "error"; text: string } | null;
@@ -29,6 +30,7 @@ export default function Settings() {
       <CompanyData onSave={save} />
       <Holidays />
       <BankRules onSave={save} />
+      <OvertimeRules onSave={save} />
 
       <section className="card" aria-labelledby="h-foto">
         <h2 id="h-foto" className="section-title">Foto na batida</h2>
@@ -133,6 +135,57 @@ function BankRules({ onSave }: { onSave: (body: object, ok: string) => Promise<v
       </div>
       <p className="muted small">O prazo depende do instrumento adotado (acordo individual ou coletivo); confirme com a assessoria jurídica. Quem usa banco de horas é definido no cadastro de cada pessoa.</p>
       <button>Salvar regras</button>
+    </form>
+  );
+}
+
+const DAY_TYPES: [keyof OvertimeRule, string][] = [["util", "Dias úteis"], ["sabado", "Sábados"], ["domingo", "Domingos"], ["feriado", "Feriados"]];
+type Row = { first: string; after: string; excess: string };
+
+function OvertimeRules({ onSave }: { onSave: (body: object, ok: string) => Promise<void> }) {
+  const { company } = useAuth();
+  const rule = company?.overtime_rule;
+  const [rows, setRows] = useState<Record<string, Row>>(() => Object.fromEntries(DAY_TYPES.map(([t]) => {
+    const b = rule?.[t] ?? { limit: null, first: t === "domingo" || t === "feriado" ? 100 : 50, excess: 100 };
+    return [t, { first: String(b.first), after: b.limit == null || b.first === b.excess ? "" : String(b.limit / 60), excess: String(b.excess) }];
+  })));
+  const set = (t: string, k: keyof Row, v: string) => setRows((r) => ({ ...r, [t]: { ...r[t], [k]: v } }));
+
+  function submit(e: FormEvent) {
+    e.preventDefault();
+    const body = Object.fromEntries(DAY_TYPES.map(([t]) => {
+      const r = rows[t];
+      const split = r.after !== "";
+      return [t, { limit: split ? Math.round(Number(r.after) * 60) : null, first: Number(r.first), excess: split ? Number(r.excess) : Number(r.first) }];
+    }));
+    void onSave({ overtime_rule: body }, "Faixas de horas extras salvas.");
+  }
+
+  return (
+    <form className="card" onSubmit={submit} aria-labelledby="h-extras">
+      <h2 id="h-extras" className="section-title">Horas extras pagas</h2>
+      <p className="muted small">
+        Para quem <b>não</b> usa banco de horas: o saldo positivo de cada dia é pago com o percentual do tipo de dia. Para mudar o percentual
+        a partir de certa quantidade de horas extras no mesmo dia (ex.: 2 primeiras a 50 %, o resto a 100 %), preencha “Depois de”.
+      </p>
+      {DAY_TYPES.map(([t, label]) => (
+        <fieldset key={t} style={{ border: 0, padding: 0, margin: "0 0 4px" }}>
+          <legend style={{ fontWeight: 600, fontSize: ".92rem", marginBottom: 4 }}>{label}</legend>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0 10px" }}>
+            <label>Percentual (%)<input type="number" min="50" max="300" required value={rows[t].first} onChange={(e) => set(t, "first", e.target.value)} /></label>
+            <label>Depois de (horas)<input type="number" min="0" max="24" step="0.5" placeholder="não muda" value={rows[t].after}
+              onChange={(e) => set(t, "after", e.target.value)} /></label>
+            <label>Passa a (%)<input type="number" min="50" max="300" disabled={rows[t].after === ""} required={rows[t].after !== ""}
+              value={rows[t].after === "" ? "" : rows[t].excess} onChange={(e) => set(t, "excess", e.target.value)} /></label>
+          </div>
+        </fieldset>
+      ))}
+      <p className="muted small">
+        Padrão: 50 % em dias úteis e sábados, 100 % em domingos e feriados (CLT art. 59 e Súmula 146 do TST); confira a convenção coletiva.
+        A regra vale para todo cálculo feito a partir de agora, inclusive de meses anteriores: mude no início de uma competência.
+        Os minutos noturnos (adicional noturno) seguem à parte, no relatório.
+      </p>
+      <button>Salvar faixas</button>
     </form>
   );
 }

@@ -14,7 +14,7 @@ from ..db import get_db
 from ..deps import can_view_user, client_ip, get_current_user, require, require_punch
 from ..models import Company, Kiosk, Punch, User
 from ..schemas import PunchIn, PunchOut, ReceiptOut
-from ..services import audit, clock, folha, pdfsign, signing
+from ..services import audit, clock, folha, overtime, pdfsign, signing
 from ..services import pdf as pdf_service
 from ..services.espelho import build_espelho
 from ..services.mirror import month_days, summarize
@@ -197,8 +197,10 @@ def mirror(
     if not target or not can_view_user(db, actor, target):
         raise HTTPException(404, "Colaborador não encontrado")
 
-    days = month_days(db, target, db.get(Company, target.company_id), int(month[:4]), int(month[5:]))
-    return {"user_id": target.id, "month": month, **summarize(days)}
+    company = db.get(Company, target.company_id)
+    days = month_days(db, target, company, int(month[:4]), int(month[5:]))
+    ot = overtime.as_dict(overtime.for_user(target, company, days))  # None para quem usa banco de horas
+    return {"user_id": target.id, "month": month, **summarize(days), "overtime": ot}
 
 
 @router.get("/mirror/folhas.pdf")

@@ -107,7 +107,7 @@ def patch_company(
     company = db.get(Company, actor.company_id)
     before = {"name": company.name, "caepf": company.caepf, "cno": company.cno,
               "timezone": company.timezone, "workplace": company.workplace, "photo_enabled": company.photo_enabled,
-              "kiosk_pin_required": company.kiosk_pin_required}
+              "kiosk_pin_required": company.kiosk_pin_required, "overtime_rule": company.overtime_rule}
     data = body.model_dump(exclude_unset=True)
     if "name" in data and not (data["name"] or "").strip():
         raise HTTPException(422, "Informe a razão social")

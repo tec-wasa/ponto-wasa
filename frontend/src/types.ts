@@ -47,7 +47,11 @@ export interface Company {
   photo_enabled?: boolean;
   kiosk_pin_required?: boolean;
   password_login?: boolean; // false: só "Entrar com Google"
+  overtime_rule?: OvertimeRule;
 }
+
+export interface OvertimeBand { limit: number | null; first: number; excess: number }
+export type OvertimeRule = Record<"util" | "sabado" | "domingo" | "feriado", OvertimeBand>;
 
 export interface Kiosk {
   id: number;
@@ -117,6 +121,8 @@ export interface Mirror {
     incomplete_days: number;
   };
   days: MirrorDay[];
+  /** Horas extras pagas, por percentual; null para quem usa banco de horas (o saldo vai para o banco). */
+  overtime?: { total: number; by_percent: { percent: number; minutes: number }[]; by_type: { type: string; label: string; minutes: number }[] } | null;
 }
 
 export interface Adjustment {

@@ -756,11 +756,12 @@ export const TOPICS: Topic[] = [
     who: "Gestor, RH e Administração",
     need: ["team.view"],
     where: { path: "/gestao/relatorios", label: "Relatórios" },
-    summary: "Fechamento mensal, banco de horas, ausências, batidas por origem e divergências da Central, em PDF ou CSV.",
+    summary: "Fechamento mensal, horas extras por percentual, banco de horas, ausências, batidas por origem e divergências da Central, em PDF ou CSV.",
     blocks: [
       {
         list: [
           "**Fechamento mensal**: escolha o mês. Horas trabalhadas, saldo, faltas, dias justificados e banco de horas de cada pessoa.",
+          "**Horas extras**: escolha o mês. As horas extras pagas de cada pessoa, separadas por percentual (50 %, 100 %…) e por tipo de dia, mais os minutos noturnos. Quem usa banco de horas aparece à parte, com o crédito do mês (não pago).",
           "**Banco de horas**: a posição de hoje (saldo, limite e horas em risco de vencer).",
           "**Ausências justificadas**: período e situação (todas, aprovadas, pendentes, rejeitadas, canceladas). Motivos de saúde só aparecem para o RH.",
           "**Batidas por origem**: cada marcação do período, com a origem (aplicativo ou Central) e a distância ao posto.",
@@ -988,7 +989,7 @@ export const TOPICS: Topic[] = [
     who: "Administração",
     need: ["company.settings"],
     where: { path: "/gestao/empresa", label: "Empresa" },
-    summary: "Dados da empresa, feriados, regras do banco de horas, foto na batida, forma de login e PIN da Central.",
+    summary: "Dados da empresa, feriados, regras do banco de horas, faixas de horas extras, foto na batida, forma de login e PIN da Central.",
     blocks: [
       { text: "Gestão > **Empresa** > aba **Configurações**. Cada quadro salva separado." },
       {
@@ -996,6 +997,7 @@ export const TOPICS: Topic[] = [
           "**Empresa**: razão social, local de prestação do serviço, CAEPF, CNO e fuso horário. O CNPJ aparece mas não muda por aqui. Mudanças nos dados do empregador ficam registradas no REP-P e na auditoria.",
           "**Feriados**: veja o tópico próprio.",
           "**Banco de horas**: **Limite do saldo** (em horas; vazio = sem limite) e **Prazo para compensar** (meses). O prazo depende do acordo adotado (individual ou coletivo); confirme com a assessoria jurídica.",
+          "**Horas extras pagas** (quem não usa banco de horas): para Dias úteis, Sábados, Domingos e Feriados, o **Percentual** pago. Para mudar o percentual a partir de certa quantidade de horas extras no mesmo dia, preencha **Depois de (horas)** e **Passa a (%)**: por exemplo, 2 primeiras horas a 50 % e o resto a 100 %. Padrão: 50 % em dias úteis e sábados, 100 % em domingos e feriados. Confira a convenção coletiva e mude só no início de uma competência, porque a regra vale também para o recálculo de meses anteriores.",
           "**Foto na batida**: liga ou desliga a foto pelo aplicativo. Cada pessoa autoriza a própria foto; as fotos são apagadas quando o mês é fechado. Na Central a foto é sempre obrigatória.",
           "**Login**: **Permitir também entrar com e-mail e senha**. Desmarcado, só se entra com o Google. Para desmarcar, vincule antes a sua própria conta Google em Minha conta.",
           "**Central do Ponto**: **Exigir PIN na Central**. Desligado, o código ou o CPF sozinho identifica a pessoa; ligado, ela também digita o PIN. O QR do aplicativo dispensa o PIN.",

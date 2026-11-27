@@ -116,6 +116,20 @@ class MeOut(UserOut):
     restriction: str | None = None  # pendência de segurança desta sessão (senha temporária, 2FA exigido)
 
 
+class OvertimeBand(BaseModel):
+    """Horas extras de um tipo de dia: as primeiras `limit` minutos pagam `first` %, o excedente paga `excess` %."""
+    limit: int | None = Field(None, ge=0, le=1440, description="Minutos da 1ª faixa por dia; vazio = tudo na 1ª faixa")
+    first: int = Field(ge=50, le=300, description="Percentual da 1ª faixa (mínimo legal: 50 %)")
+    excess: int = Field(ge=50, le=300, description="Percentual do excedente")
+
+
+class OvertimeRule(BaseModel):
+    util: OvertimeBand
+    sabado: OvertimeBand
+    domingo: OvertimeBand
+    feriado: OvertimeBand
+
+
 class CompanyOut(ORM):
     id: int
     name: str
@@ -129,6 +143,14 @@ class CompanyOut(ORM):
     photo_enabled: bool = False
     kiosk_pin_required: bool = False
     password_login: bool = True
+    overtime_rule: dict | None = None
+
+    @field_validator("overtime_rule", mode="after")
+    @classmethod
+    def _effective_rule(cls, v):
+        from .services.overtime import DAY_TYPES, DEFAULT_RULE  # a tela recebe sempre a regra completa
+        saved = v or {}
+        return {t: {**DEFAULT_RULE[t], **(saved.get(t) or {})} for t in DAY_TYPES}
 
 
 class CompanyPatch(BaseModel):
@@ -142,6 +164,7 @@ class CompanyPatch(BaseModel):
     photo_enabled: bool | None = None
     kiosk_pin_required: bool | None = None
     password_login: bool | None = None
+    overtime_rule: OvertimeRule | None = None
 
 
 class ScheduleIn(BaseModel):

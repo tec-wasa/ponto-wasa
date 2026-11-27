@@ -49,6 +49,8 @@ class Company(Base):
     kiosk_pin_required: Mapped[bool] = mapped_column(Boolean, default=False)
     password_login: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())  # False = só "Entrar com Google"
     holiday_carnaval: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())  # segunda e terça de Carnaval
+    # Horas extras pagas (quem não usa banco de horas): faixas por tipo de dia. Vazio = padrão (services/overtime.py).
+    overtime_rule: Mapped[dict | None] = mapped_column(JSON, default=None)
     holiday_corpus_christi: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())  # a Central pede o PIN (configurável; padrão: não)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 

@@ -61,6 +61,16 @@ export default function Reports() {
         {buttons("m", `/reports/monthly?month=${month}`, `fechamento-${month}`, !month)}
       </section>
 
+      <section className="card" aria-labelledby="r-extras">
+        <h2 id="r-extras" className="section-title">Horas extras</h2>
+        <p className="muted small">
+          Horas extras pagas do mês, por percentual (50 %, 100 %…) e por tipo de dia, conforme as faixas em Empresa &gt; Configurações.
+          Quem usa banco de horas aparece à parte, com o crédito do mês.
+        </p>
+        <label>Mês<input type="month" value={month} max={currentMonth(tz)} onChange={(e) => setMonth(e.target.value)} /></label>
+        {buttons("x", `/reports/overtime?month=${month}`, `horas-extras-${month}`, !month)}
+      </section>
+
       <section className="card" aria-labelledby="r-banco">
         <h2 id="r-banco" className="section-title">Banco de horas</h2>
         <p className="muted small">Posição de hoje de quem usa banco de horas: saldo, limite e horas em risco de vencer.</p>

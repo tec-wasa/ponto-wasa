@@ -39,7 +39,7 @@ No portal, a regra de cálculo é um cadastro à parte, com nome, que se vincula
 |---|---|---|---|
 | Regra com nome, separada da jornada, vinculada a grupos de pessoas; botão **Duplicar regra** | Sim | ❌ banco de horas e tolerância ficam na empresa e na jornada | P2 |
 | Tipo de controle: **Banco de horas** ou **Hora extra** (paga) | Sim | 🟡 banco liga/desliga por pessoa; sem modo "hora extra paga" com faixas | P1 |
-| **Faixas de hora extra** (1ª fase, 2ª fase, excedente) separadas para dias úteis, sábados, domingos e feriados, diurnas e noturnas, com **percentuais por tipo** (50 %, 100 %, …) | Sim | ❌ só calculamos o saldo e avisamos acima de 2 h | P1 |
+| **Faixas de hora extra** (1ª fase, 2ª fase, excedente) separadas para dias úteis, sábados, domingos e feriados, diurnas e noturnas, com **percentuais por tipo** (50 %, 100 %, …) | Sim | ✅ implementado em 27/11/2026: duas faixas por tipo de dia (Empresa › Configurações), relatório "Horas extras" e linha no espelho. Sem faixa noturna separada (minutos noturnos à parte) | — |
 | Hora noturna: configurável entre **hora ficta** (7 h = 8 h) e padrão; início e fim ajustáveis (19h–08h); **hora noturna estendida** (Súmula 60) | Sim | 🟡 hora reduzida fixa das 22h às 5h, sem prorrogação | P2 |
 | Controle de atrasos: horário **flexível** ou **rígido** + tolerância | Sim | 🟡 temos a tolerância | P3 |
 | **Dia de fechamento da folha** (ex.: período de 21 a 20) | Sim | ❌ o mês é sempre o calendário | P1 |
