@@ -173,6 +173,7 @@ textarea { min-height: 88px; }
 .alert { padding: 10px 14px; border-radius: 12px; margin: 0 0 12px; border: 1px solid; }
 .alert.error { color: var(--danger); border-color: var(--danger); }
 .alert.ok { color: var(--ok); border-color: var(--ok); }
+.alert.warn { color: var(--warn-text); border-color: var(--warn-text); background: var(--warn-bg); }
 .alert.info { color: var(--text); border-color: var(--border); background: var(--avatar-bg); }
 
 /* Registrar ponto */

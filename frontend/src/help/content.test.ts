@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { GROUPS, TOPICS } from "./content";
 
 const ROUTES = ["/", "/registros", "/solicitacoes", "/banco", "/conta", "/mais", "/gestao", "/gestao/aprovacoes", "/gestao/espelhos",
-  "/gestao/tratamento", "/gestao/inconsistencias", "/gestao/banco", "/gestao/ausencias", "/gestao/relatorios", "/gestao/cadastros", "/gestao/empresa"];
+  "/gestao/tratamento", "/gestao/inconsistencias", "/gestao/banco", "/gestao/ausencias", "/gestao/relatorios", "/gestao/folha", "/gestao/cadastros", "/gestao/empresa"];
 
 describe("manual", () => {
   it("tópicos com id único, grupo válido e conteúdo", () => {

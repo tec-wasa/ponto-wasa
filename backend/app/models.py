@@ -51,6 +51,8 @@ class Company(Base):
     holiday_carnaval: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())  # segunda e terça de Carnaval
     # Horas extras pagas (quem não usa banco de horas): faixas por tipo de dia. Vazio = padrão (services/overtime.py).
     overtime_rule: Mapped[dict | None] = mapped_column(JSON, default=None)
+    # Exportação para a folha: sistema, código da empresa nele e código de cada verba (services/payroll.py).
+    payroll_export: Mapped[dict | None] = mapped_column(JSON, default=None)
     holiday_corpus_christi: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())  # a Central pede o PIN (configurável; padrão: não)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
@@ -112,6 +114,8 @@ class User(Base):
     punch_policy: Mapped[str] = mapped_column(String(8), default="both")  # both = aplicativo e Central; kiosk = só a Central
     # Central do Ponto: código interno (identifica), PIN opcional (confirma) e crachá QR
     employee_code: Mapped[str | None] = mapped_column(String(8), default=None)
+    # Matrícula da pessoa no sistema de folha (Domínio, Alterdata...). Não é o código da Central, que identifica no ponto.
+    payroll_code: Mapped[str | None] = mapped_column(String(10), default=None)
     pin_hash: Mapped[str | None] = mapped_column(Text, default=None)
     pin_fails: Mapped[int] = mapped_column(Integer, default=0)
     pin_locked_until: Mapped[datetime | None] = mapped_column(DateTime, default=None)

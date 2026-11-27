@@ -14,7 +14,22 @@ from . import (
 )
 from .config import settings
 from .db import SessionLocal, get_db, init_schema
-from .routers import absences, admin, auth, exports, holidays, imports, inconsistencies, kiosk, panel, photos, punches, reports, workflow
+from .routers import (
+    absences,
+    admin,
+    auth,
+    exports,
+    holidays,
+    imports,
+    inconsistencies,
+    kiosk,
+    panel,
+    payroll,
+    photos,
+    punches,
+    reports,
+    workflow,
+)
 from .services import arp
 
 API_PREFIX = "/api"
@@ -45,7 +60,7 @@ app = FastAPI(
 )
 observability.install(app)
 
-for r in (auth.router, admin.router, punches.router, workflow.router, exports.router, panel.router, absences.router, reports.router, photos.router, kiosk.router, holidays.router, imports.router, inconsistencies.router):
+for r in (auth.router, admin.router, punches.router, workflow.router, exports.router, panel.router, absences.router, reports.router, photos.router, kiosk.router, holidays.router, imports.router, inconsistencies.router, payroll.router):
     app.include_router(r, prefix=API_PREFIX)
 
 

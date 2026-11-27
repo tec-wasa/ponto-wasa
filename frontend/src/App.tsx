@@ -10,6 +10,7 @@ import Diagnostic from "./pages/Diagnostic";
 import { Privacy, Terms } from "./pages/Legal";
 import Help from "./pages/Help";
 import Inconsistencies from "./pages/Inconsistencies";
+import Payroll from "./pages/Payroll";
 import Login from "./pages/Login";
 import Mirror from "./pages/Mirror";
 import More from "./pages/More";
@@ -77,6 +78,7 @@ export function areaItems(can: (p: Permission) => boolean) {
     ...(team ? [{ to: "/gestao/inconsistencias", label: "Inconsistências", hint: "Falta, intervalo, 11 h entre jornadas, 7º dia, horas extras" }] : []),
     ...(team ? [{ to: "/gestao/banco", label: "Banco de horas", hint: "Saldos e lançamentos" }] : []),
     ...(team ? [{ to: "/gestao/ausencias", label: "Ausências", hint: "Atestados, férias, licenças e afastamentos" }] : []),
+    ...(can("closing.manage") ? [{ to: "/gestao/folha", label: "Folha de pagamento", hint: "Horas extras, noturno, faltas e DSR para a Domínio, a Alterdata ou CSV" }] : []),
     ...(team ? [{ to: "/gestao/relatorios", label: "Relatórios", hint: "Fechamento mensal, banco de horas, ausências", icon: <IconBars /> }] : []),
     ...(can("people.list") && (can("people.manage") || can("kiosks.view")) ? [{ to: "/gestao/cadastros", label: "Cadastros", hint: "Pessoas, jornadas e centrais" }] : []),
     ...(empresa.length ? [{ to: "/gestao/empresa", label: "Empresa", hint: empresa.join(", ").replace(/^./, (c) => c.toUpperCase()) }] : []),
@@ -196,6 +198,7 @@ export default function App() {
           {can("team.view") && <Route path="/gestao/banco" element={<TeamBank />} />}
           {can("team.view") && <Route path="/gestao/ausencias" element={<TeamAbsences />} />}
           {can("team.view") && <Route path="/gestao/relatorios" element={<Reports />} />}
+          {can("closing.manage") && <Route path="/gestao/folha" element={<Payroll />} />}
           {mgmt.some((i) => i.to === "/gestao/cadastros") && <Route path="/gestao/cadastros" element={<Cadastros />} />}
           {mgmt.some((i) => i.to === "/gestao/empresa") && <Route path="/gestao/empresa" element={<Empresa />} />}
           <Route path="/conta" element={<Account />} />

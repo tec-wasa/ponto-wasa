@@ -750,6 +750,42 @@ export const TOPICS: Topic[] = [
     ],
   },
   {
+    id: "folha-pagamento",
+    group: "Gestão do dia a dia",
+    title: "Folha de pagamento: arquivo para a Domínio, a Alterdata ou CSV",
+    who: "RH e Administração",
+    need: ["closing.manage"],
+    where: { path: "/gestao/folha", label: "Folha de pagamento" },
+    summary: "Gerar os eventos do mês (horas extras por percentual, adicional noturno, faltas, DSR perdido e atrasos) no arquivo de importação do sistema de folha.",
+    blocks: [
+      {
+        text: "O aplicativo calcula os eventos do mês a partir do espelho de cada pessoa, com as correções e ausências já aprovadas, e gera o arquivo que o sistema de folha importa. Cada arquivo gerado fica na auditoria.",
+      },
+      {
+        h: "Primeira vez",
+        steps: [
+          "Em **Sistema de folha e verbas**, escolha o sistema (Domínio, Alterdata ou planilha CSV) e informe o código da empresa nele.",
+          "Informe o código de cada verba no sistema de folha. Verba sem código não vai para o arquivo.",
+          "Na tabela do mês, preencha a **matrícula** de cada pessoa no sistema de folha e clique em **Salvar matrículas**. A matrícula não é o código da Central.",
+          "Faça a primeira importação num mês de teste e confira com o seu escritório contábil.",
+        ],
+      },
+      {
+        h: "O que vai no arquivo",
+        list: [
+          "**Horas extras** por percentual, conforme as faixas em Empresa > Configurações. Só de quem não usa banco de horas.",
+          "**Adicional noturno**: as horas entre 22h e 5h, já com a hora noturna reduzida (52min30s valem 1 h).",
+          "**Faltas**: dias de trabalho sem marcação nem justificativa. Na Domínio, as datas vão logo abaixo da verba de faltas.",
+          "**DSR perdido**: o domingo da semana em que houve falta sem justificativa.",
+          "**Atrasos e saídas antecipadas**: as horas a menos nos dias trabalhados. Só de quem não usa banco de horas.",
+        ],
+      },
+      {
+        tip: "Horas vão em horas centesimais (10h30 = 10,50). Feche o mês em Empresa > Fechamento antes de gerar o arquivo: assim o ponto não muda depois de enviado.",
+      },
+    ],
+  },
+  {
     id: "relatorios",
     group: "Gestão do dia a dia",
     title: "Relatórios",

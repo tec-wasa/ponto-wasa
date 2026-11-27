@@ -119,7 +119,7 @@ valer depois de aprovada.
 
 | Funcionalidade | Portal | Nosso app | Prioridade |
 |---|---|---|---|
-| **Exportar eventos para a folha** com layouts prontos para cerca de 70 sistemas (Domínio, Alterdata, Fortes, Questor, Totvs RM, Sênior, Contmatic, Nasajon, SCI, Folha Sólides, eSocial…) | Sim | ❌ só o CSV genérico | **P1**: o Domínio e o Alterdata cobrem a maioria dos escritórios contábeis |
+| **Exportar eventos para a folha** com layouts prontos para cerca de 70 sistemas (Domínio, Alterdata, Fortes, Questor, Totvs RM, Sênior, Contmatic, Nasajon, SCI, Folha Sólides, eSocial…) | Sim | ✅ implementado em 27/11/2026 (Gestão › Folha de pagamento): Domínio (TXT de lançamentos, com datas de falta e DSR), Alterdata (movimento de Lançamento por Funcionário) e CSV; código de cada verba e matrícula de cada pessoa. Os outros sistemas ficam com o CSV | — |
 | **Configuração de eventos** (código de cada verba: HE 50 %, HE 100 %, adicional noturno, falta, DSR) | Sim | ❌ | P1 (vem junto) |
 | **"Meus contadores"** + **"Enviar para a Central do Contador"** | Sim | ❌ | P2: perfil de contador externo com acesso só de leitura e exportação |
 | Gestão de banco de horas: **quitação** (zerar o saldo vencido, pagar como hora extra, quitar até um limite ou valor a valor), em lote, por competência | Sim | 🟡 temos ajuste manual de saldo | P2 |
