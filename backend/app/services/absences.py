@@ -79,7 +79,7 @@ def serialize(actor: User, a: Absence, owner_name: str | None = None) -> dict:
         "start_date": a.start_date.isoformat(), "end_date": a.end_date.isoformat(), "minutes": a.minutes,
         "reason": a.reason if detail else None, "attachment_name": a.attachment_name if detail else None,
         "restricted": not detail, "status": a.status, "decided_by": a.decided_by, "decision_note": a.decision_note,
-        "created_by": a.created_by,
+        "created_by": a.created_by, "batch_id": a.batch_id,
     }
 
 

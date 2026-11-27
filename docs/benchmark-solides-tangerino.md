@@ -140,7 +140,7 @@ valer depois de aprovada.
 
 | Funcionalidade | Portal | Nosso app | Prioridade |
 |---|---|---|---|
-| **Ajuste em lote**: um motivo (ex.: ponte de feriado, queda de energia) num período, para várias pessoas, de dia inteiro ou só um trecho de horário; também **exclusão em lote** | Sim | ❌ abono é um por pessoa | **P1**: muito usado em ponte de feriado e recesso |
+| **Ajuste em lote**: um motivo (ex.: ponte de feriado, queda de energia) num período, para várias pessoas, de dia inteiro ou só um trecho de horário; também **exclusão em lote** | Sim | ✅ implementado em 27/11/2026 (Gestão › Ausências: abono ou férias coletivas, conferir antes, cancelar o lote inteiro). O trecho é informado em horas, não por horário de início e fim | — |
 | **Ações em lote** por planilha: baixar a planilha filtrada, editar e subir (cadastro, saldo de banco, tempo máximo de jornada) | Sim | 🟡 importação CSV de pessoas (só inclusão) | P2 |
 | **Cadastro de motivos de ajuste** com flags: abona? conta falta? entra no absenteísmo? liberado para gestor? para colaborador? ativo? (ABONO, ATESTADO DE ACOMPANHAMENTO, AVISO PRÉVIO, COMPENSAÇÃO, DAY OFF, FALTA JUSTIFICADA ABONADA/NÃO ABONADA…) | Sim | 🟡 os tipos de ausência estão fixos no código | P2 |
 | **Justificativas de atraso** cadastráveis (anexo e observação obrigatórios) | Sim | ❌ o motivo é texto livre | P3 |

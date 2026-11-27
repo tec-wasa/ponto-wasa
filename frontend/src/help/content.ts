@@ -715,7 +715,7 @@ export const TOPICS: Topic[] = [
     who: "Gestor, RH e Administração",
     need: ["team.view"],
     where: { path: "/gestao/ausencias", label: "Ausências" },
-    summary: "Ver as ausências da equipe ou da empresa e registrar férias, licenças e afastamentos em nome de alguém.",
+    summary: "Ver as ausências da equipe ou da empresa, registrar férias, licenças e afastamentos em nome de alguém e lançar abono ou férias coletivas para várias pessoas.",
     blocks: [
       {
         h: "Registrar (RH e Administração)",
@@ -725,6 +725,20 @@ export const TOPICS: Topic[] = [
           "Informe **De** e **Até** (para um dia só, pode escolher Parte do dia em atestado e abono).",
           "Escreva o **Motivo** (sem diagnóstico nem CID) e toque em **Registrar**. A ausência registrada pelo RH já entra aprovada.",
         ],
+      },
+      {
+        h: "Para várias pessoas de uma vez (em lote)",
+        steps: [
+          "Gestão > **Ausências** > **Lançar para várias pessoas (em lote)**. Serve para ponte de feriado, recesso, queda de energia ou férias coletivas.",
+          "Escolha **Abono** ou **Férias coletivas**, o período (**De** e **Até**) e, no abono de um dia só, se é o **Dia inteiro** ou **Parte do dia**.",
+          "Escolha um motivo pronto ou escreva o seu.",
+          "Marque as pessoas: uma a uma, **Todas** ou por cargo (**+ cargo**). A busca pelo nome ajuda em equipes grandes.",
+          "Toque em **Conferir**. Nada é gravado ainda: aparece quantas pessoas recebem e quem fica de fora, com o motivo (ex.: já tem atestado no período).",
+          "Toque em **Lançar**. Cada pessoa recebe a ausência já aprovada; no espelho o dia aparece como Justificado.",
+        ],
+      },
+      {
+        text: "Em **Lotes lançados** fica cada lote, com quem lançou e para quem. **Cancelar lote** desfaz o lote inteiro de uma vez (enquanto o mês estiver aberto); para tirar uma pessoa só, cancele a ausência dela na lista abaixo.",
       },
       {
         list: [

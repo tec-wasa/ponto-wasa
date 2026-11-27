@@ -4,6 +4,7 @@ import { api } from "../api";
 import { useAuth } from "../auth";
 import type { Absence, User } from "../types";
 import { todayLocal } from "../util";
+import AbsenceBatch from "./AbsenceBatch";
 import { ABS_STATUS, AbsenceForm, HR_KINDS, absencePeriod } from "./Absences";
 
 /** Gestão > Ausências: as ausências da equipe/empresa e, para o RH, o registro direto (já aprovado) e o cancelamento. */
@@ -55,6 +56,8 @@ export default function TeamAbsences() {
         </details>
       )}
 
+      {register && <AbsenceBatch people={people} onChanged={() => void load()} onMsg={(m) => { setMsg(m); window.scrollTo({ top: 0, behavior: "smooth" }); }} />}
+
       <section className="card" aria-labelledby="h-lista">
         <h2 id="h-lista" className="section-title">{user?.scope === "team" ? "Ausências da equipe" : "Ausências da empresa"}</h2>
         {list.length === 0 ? <p className="muted" style={{ margin: 0 }}>Nenhuma ausência registrada.</p> : (
@@ -62,7 +65,7 @@ export default function TeamAbsences() {
             {list.map((a) => (
               <li key={a.id} className="request">
                 <div className="row" style={{ justifyContent: "space-between", flexWrap: "nowrap" }}>
-                  <span><strong>{a.user_name}</strong> · {a.kind_label} · {absencePeriod(a)}</span>
+                  <span><strong>{a.user_name}</strong> · {a.kind_label} · {absencePeriod(a)}{a.batch_id && <span className="muted small"> · em lote</span>}</span>
                   <span className={`tag ${a.status}`} style={{ flex: "none" }}>{ABS_STATUS[a.status]}</span>
                 </div>
                 <span className="muted small">{a.restricted ? "Motivo restrito ao RH (dado de saúde)" : a.reason}</span>

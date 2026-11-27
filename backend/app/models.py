@@ -236,6 +236,7 @@ class Absence(Base):
     decided_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), default=None)
     decided_at: Mapped[datetime | None] = mapped_column(DateTime, default=None)
     decision_note: Mapped[str | None] = mapped_column(Text, default=None)
+    batch_id: Mapped[str | None] = mapped_column(String(32), index=True, default=None)  # lançamento em lote (várias pessoas)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 

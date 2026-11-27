@@ -243,6 +243,7 @@ export interface Absence {
   created_by: number;
   can_decide?: boolean;
   self_decision?: boolean;
+  batch_id?: string | null;
 }
 
 export interface TwoFactorStatus {
